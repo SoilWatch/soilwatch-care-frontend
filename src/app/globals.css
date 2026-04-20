@@ -1,26 +1,51 @@
 @import "tailwindcss";
+@import "mapbox-gl/dist/mapbox-gl.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* SoilWatch brand tokens */
+  --earth-gold:        #f9c349;
+  --earth-gold-strong: #ffb100;
+  --earth-700:         #8d5908;
+  --soil-dark:         #1e1810;
+  --soil-copy:         #62615c;
+  --stone:             #f8f7f3;
+  --stone-deep:        #efede6;
+  --panel:             #fffdf8;
+  --carbon:            #4b4f58;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-earth-50:    rgb(255 249 233);
+  --color-earth-100:   rgb(255 240 191);
+  --color-earth-200:   rgb(254 224 143);
+  --color-earth-300:   #f9c349;
+  --color-earth-400:   #ffb100;
+  --color-earth-600:   #b97600;
+  --color-earth-700:   #8d5908;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-soil-50:     rgb(248 247 243);
+  --color-soil-100:    rgb(239 237 230);
+  --color-soil-200:    rgb(221 217 208);
+  --color-soil-300:    rgb(193 188 176);
+  --color-soil-400:    rgb(151 146 132);
+  --color-soil-500:    rgb(122 118 109);
+  --color-soil-600:    #62615c;
+  --color-soil-700:    #4b4f58;
+  --color-soil-800:    rgb(49 44 37);
+  --color-soil-900:    #1e1810;
+
+  --color-panel:       #fffdf8;
+  --color-stone-soft:  #f8f7f3;
+  --color-stone-deep:  #efede6;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--stone);
+  color: var(--soil-dark);
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d4c9b0; border-radius: 3px; }

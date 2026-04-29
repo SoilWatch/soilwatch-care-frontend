@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -9,7 +10,6 @@ import {
   FlameKindling,
   BarChart3,
   Settings,
-  Leaf,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -27,26 +27,13 @@ export default function Sidebar() {
   return (
     <aside className="w-60 flex-shrink-0 flex flex-col h-full" style={{ background: "#1e1810" }}>
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10">
+      <div className="px-5 py-4 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: "#ffb100" }}
-          >
-            <Leaf size={16} className="text-white" />
-          </div>
+          <Image src="/soilwatch-logo.jpg" alt="SoilWatch" width={30} height={30} className="rounded-md object-contain" />
           <div>
             <p className="text-white font-semibold text-sm leading-none">SoilWatch</p>
             <p className="text-white/40 text-[10px] mt-0.5 uppercase tracking-wider">CARE dMRV</p>
           </div>
-        </div>
-      </div>
-
-      {/* Tenant badge */}
-      <div className="px-5 py-3 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ background: "#ffb100" }} />
-          <span className="text-white/50 text-xs">Afar Region — Ethiopia</span>
         </div>
       </div>
 
@@ -82,7 +69,6 @@ export default function Sidebar() {
           <Settings size={16} />
           Settings
         </Link>
-        <p className="text-white/20 text-[10px] px-3 mt-3">Phase 1 — v0.1.0</p>
       </div>
     </aside>
   );

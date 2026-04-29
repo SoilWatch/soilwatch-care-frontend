@@ -3,12 +3,12 @@ import clsx from "clsx";
 type Variant = "earth" | "soil" | "red" | "carbon" | "stone" | "green";
 
 const variants: Record<Variant, string> = {
-  earth:  "bg-[#fff4cc] text-[#8d5908]",
-  soil:   "bg-[#f8f7f3] text-[#62615c]",
-  red:    "bg-red-50 text-red-700",
-  carbon: "bg-[#e8eaed] text-[#4b4f58]",
-  stone:  "bg-[#efede6] text-[#62615c]",
-  green:  "bg-emerald-50 text-emerald-700",
+  earth:  "bg-[#fffbeb] text-[#92400e]",
+  soil:   "bg-[#f8f9fa] text-[#6b7280]",
+  red:    "bg-[#FADBD8] text-[#E74C3C]",
+  carbon: "bg-[#eff6ff] text-[#2E75B6]",
+  stone:  "bg-[#f8f9fa] text-[#6b7280]",
+  green:  "bg-[#D5F5E3] text-[#166534]",
 };
 
 export default function Badge({

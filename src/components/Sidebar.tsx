@@ -15,9 +15,9 @@ import clsx from "clsx";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/prosopis", label: "Prosopis Map", icon: Layers },
+  { href: "/prosopis", label: "Project Map", icon: Layers },
   { href: "/harvesting", label: "Harvesting", icon: Pickaxe },
-  { href: "/biochar", label: "Biochar", icon: FlameKindling },
+  { href: "/biochar", label: "Production", icon: FlameKindling },
   { href: "/reports", label: "Reports", icon: BarChart3 },
 ];
 

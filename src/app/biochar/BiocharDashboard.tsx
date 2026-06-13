@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   Line, ReferenceLine, ReferenceArea,
@@ -9,10 +10,10 @@ import {
   ScatterChart, Scatter, ResponsiveContainer, ComposedChart, Area,
 } from "recharts";
 import {
-  MOCK_BATCHES,
   PYRO_MIN, PYRO_MAX, ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE,
   type Batch, type FeedstockAppearance,
 } from "./data";
+import type { BiocharDataSource } from "./ona";
 
 const KilnMapClient = dynamic(() => import("./KilnMapClient"), { ssr: false });
 
@@ -91,7 +92,7 @@ function TabButton({ active, onClick, children }: {
 }
 
 // ── Date helpers ────────────────────────────────────────────────────────────
-const TODAY = "2026-04-29";
+const TODAY = new Date().toISOString().slice(0, 10);
 function daysAgo(days: number): string {
   const d = new Date(TODAY);
   d.setDate(d.getDate() - days);
@@ -110,20 +111,31 @@ function seriesColor(id: string): string {
 }
 
 // ── Main component ──────────────────────────────────────────────────────────
-export default function BiocharDashboard({ mapboxToken, batches }: { mapboxToken: string; batches?: Batch[] }) {
+export default function BiocharDashboard({
+  mapboxToken,
+  dataSource,
+}: {
+  mapboxToken: string;
+  dataSource?: BiocharDataSource;
+}) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
-  const sourceBatches = batches?.length ? batches : MOCK_BATCHES;
+  const [showSnapshot, setShowSnapshot] = useState(false);
+  const [showAi, setShowAi] = useState(false);
+  const sourceBatches = useMemo(() => dataSource?.batches ?? [], [dataSource?.batches]);
 
   const allDates = sourceBatches.map(b => b.production_date).sort();
-  const [dateFrom, setDateFrom] = useState(allDates[0]);
-  const [dateTo,   setDateTo]   = useState(allDates[allDates.length - 1]);
+  const firstDate = allDates[0] ?? "";
+  const lastDate = allDates[allDates.length - 1] ?? "";
+  const [dateFrom, setDateFrom] = useState(firstDate);
+  const [dateTo,   setDateTo]   = useState(lastDate);
   const allKilns = [...new Set(sourceBatches.map(b => b.kiln_id))].sort();
   const allOps   = [...new Set(sourceBatches.map(b => b.operator_name))].sort();
   const [selKilns, setSelKilns] = useState<string[]>(allKilns);
   const [selOps,   setSelOps]   = useState<string[]>(allOps);
 
   const df = useMemo(() => sourceBatches.filter(b =>
-    b.production_date >= dateFrom && b.production_date <= dateTo &&
+    (!dateFrom || b.production_date >= dateFrom) && (!dateTo || b.production_date <= dateTo) &&
     selKilns.includes(b.kiln_id) && selOps.includes(b.operator_name)
   ), [dateFrom, dateTo, selKilns, selOps, sourceBatches]);
 
@@ -148,74 +160,156 @@ export default function BiocharDashboard({ mapboxToken, batches }: { mapboxToken
   const safetyInc    = df.filter(b => b.safety_incidents.toLowerCase() !== "none").length;
   const samplesCol   = df.filter(b => b.c_sample_collected).length;
   const durationFlag = avgDuration > 0 && (avgDuration < PYRO_MIN || avgDuration > PYRO_MAX);
+  const kpis: DashboardKpis = {
+    totalBatches, monthBatches, weekBatches, totalBiochar, monthBiochar,
+    activeKilns, totalKilns, activeOps, totalOps, qualPassRate, compFlagsN,
+    csiCompliant, nonCompliant, avgDuration, minDuration, maxDuration,
+    safetyInc, samplesCol,
+  };
+  const snapshot = useMemo(() => computeDecisionSnapshot(df), [df]);
+  const siteTrends = useMemo(() => computeSiteTrends(df), [df]);
+
+  const dataStatus = dataSource?.error ? "ONA unavailable" : "Live ONA";
+  const loadedAt = dataSource?.loadedAt
+    ? new Date(dataSource.loadedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
+    : "Not loaded";
+  const systematicGaps = [
+    df.length > 0 && df.every(b => !b.c_feedstock_weight) ? "feedstock weight" : "",
+    df.length > 0 && df.every(b => !b.c_feedstock_moisture) ? "moisture readings" : "",
+    df.length > 0 && df.every(b => !b.c_temp_data) ? "temperature data" : "",
+  ].filter(Boolean);
 
   const TABS = [
-    "📈 Production Overview",
-    "✅ Quality & Compliance",
-    "⚠️ Operational Issues",
-    "🗺️ Map",
-    "🌍 Carbon & Climate",
-    "📋 Batch Records",
-    "🔍 Data Quality",
+    "Production",
+    "Quality & Compliance",
+    "Operations",
+    "Map",
+    "Carbon",
+    "Records",
+    "Data Quality",
+    "Export",
   ];
 
   return (
-    <div className="flex min-h-full flex-col bg-white" style={{ fontFamily: "system-ui, sans-serif" }}>
-        <div className="bg-white px-6 pt-4">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-3xl font-bold" style={{ color: C.title }}>Biochar Production Dashboard</h1>
-            </div>
+    <div className="min-h-full bg-[#f8f7f3]" style={{ fontFamily: "system-ui, sans-serif" }}>
+      <header className="border-b bg-white px-6 py-4" style={{ borderColor: C.metricBorder }}>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.subtext }}>
+              Afar Prosopis Biochar Project
+            </p>
+            <h1 className="text-2xl font-bold" style={{ color: C.title }}>Production Dashboard</h1>
+            <p className="mt-1 text-sm" style={{ color: C.subtext }}>
+              CP2 pyrolysis production from Prosopis removal - CARE Ethiopia | SoilWatch dMRV
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setShowSnapshot(prev => !prev)}
+              className="rounded border bg-white px-3 py-1.5 font-semibold"
+              style={{ borderColor: C.metricBorder, color: C.title }}
+            >
+              Decision Snapshot
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAi(true)}
+              className="rounded border px-3 py-1.5 font-semibold"
+              style={{ borderColor: C.blue, background: C.blue, color: "white" }}
+            >
+              Ask AI
+            </button>
+            <span className="rounded border bg-white px-3 py-1.5 font-semibold" style={{ borderColor: C.metricBorder, color: C.title }}>
+              {dataStatus}
+            </span>
+            {dataSource?.formId && (
+              <span className="rounded border bg-white px-3 py-1.5" style={{ borderColor: C.metricBorder, color: C.subtext }}>
+                ONA form {dataSource.formId}
+              </span>
+            )}
+            <span className="rounded border bg-white px-3 py-1.5" style={{ borderColor: C.metricBorder, color: C.subtext }}>
+              Loaded {loadedAt}
+            </span>
           </div>
         </div>
+        {dataSource?.error && (
+          <div className="mt-3 rounded border px-3 py-2 text-sm" style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
+            {dataSource.error}
+          </div>
+        )}
+      </header>
 
-        <div className="bg-white border-b px-6 py-3 flex flex-wrap gap-4 items-end" style={{ borderColor: C.metricBorder }}>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold" style={{ color: C.subtext }}>Date from</label>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="border rounded px-2 py-1 text-sm" style={{ borderColor: C.metricBorder }} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold" style={{ color: C.subtext }}>Date to</label>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="border rounded px-2 py-1 text-sm" style={{ borderColor: C.metricBorder }} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold" style={{ color: C.subtext }}>Kiln</label>
-            <div className="flex gap-3">
-              {allKilns.map(k => (
-                <label key={k} className="flex items-center gap-1 text-sm cursor-pointer">
-                  <input type="checkbox" checked={selKilns.includes(k)}
-                    onChange={e => setSelKilns(prev => e.target.checked ? [...prev, k] : prev.filter(x => x !== k))} />
-                  {k}
-                </label>
-              ))}
+      <div className="p-4">
+        <section className="mb-4 rounded-lg border bg-white p-3" style={{ borderColor: C.metricBorder }}>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="mr-auto">
+              <h2 className="text-sm font-semibold" style={{ color: C.title }}>Filters</h2>
+              <p className="text-xs" style={{ color: C.subtext }}>{totalBatches} batch(es) visible from ONA</p>
             </div>
+            <label className="flex flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+              Date from
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                className="border rounded px-2 py-1.5 text-sm font-normal" style={{ borderColor: C.metricBorder, color: C.title }} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+              Date to
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                className="border rounded px-2 py-1.5 text-sm font-normal" style={{ borderColor: C.metricBorder, color: C.title }} />
+            </label>
+            <label className="flex min-w-40 flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+              Kilns
+              <select
+                multiple
+                value={selKilns}
+                onChange={event => setSelKilns(Array.from(event.currentTarget.selectedOptions, option => option.value))}
+                className="h-16 rounded border px-2 py-1 text-sm font-normal"
+                style={{ borderColor: C.metricBorder, color: C.title }}
+              >
+                {allKilns.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </label>
+            <label className="flex min-w-52 flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+              Operators
+              <select
+                multiple
+                value={selOps}
+                onChange={event => setSelOps(Array.from(event.currentTarget.selectedOptions, option => option.value))}
+                className="h-16 rounded border px-2 py-1 text-sm font-normal"
+                style={{ borderColor: C.metricBorder, color: C.title }}
+              >
+                {allOps.map(op => <option key={op} value={op}>{op}</option>)}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="rounded border px-2 py-1 text-xs font-medium"
+              style={{ borderColor: C.blue, color: C.blue }}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDateFrom(firstDate); setDateTo(lastDate); setSelKilns(allKilns); setSelOps(allOps); }}
+              className="rounded border px-2 py-1 text-xs font-medium"
+              style={{ borderColor: C.metricBorder, color: C.subtext }}
+            >
+              Reset
+            </button>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold" style={{ color: C.subtext }}>Operator</label>
-            <div className="flex flex-wrap gap-3">
-              {allOps.map(op => (
-                <label key={op} className="flex items-center gap-1 text-sm cursor-pointer">
-                  <input type="checkbox" checked={selOps.includes(op)}
-                    onChange={e => setSelOps(prev => e.target.checked ? [...prev, op] : prev.filter(x => x !== op))} />
-                  {op}
-                </label>
-              ))}
-            </div>
-          </div>
-          <span className="text-xs ml-auto self-center" style={{ color: C.subtext }}>
-            Showing <strong>{totalBatches}</strong> batch(es)
-          </span>
-        </div>
+        </section>
 
-        {totalBatches === 0 ? (
-          <div className="mx-6 mt-4 rounded-lg border p-3 text-sm" style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
-            No batches match the current filters.
-          </div>
-        ) : (
-          <>
-            <div className="px-6 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <main className="min-w-0">
+          {totalBatches === 0 ? (
+            <div className="rounded-lg border bg-white p-4 text-sm" style={{ borderColor: C.orange, color: "#92400e" }}>
+              {dataSource?.error ? "No ONA data is available until the connection issue is fixed." : "No batches match the current filters."}
+            </div>
+          ) : (
+            <>
+              {showSnapshot && <DecisionSnapshotPanel snapshot={snapshot} />}
+
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <MetricCard label="Total Batches" value={totalBatches}
                 sub={`This month: ${monthBatches} · This week: ${weekBatches}`} />
               <MetricCard label="Biochar Produced" value={`${totalBiochar.toFixed(0)} kg`}
@@ -234,23 +328,26 @@ export default function BiocharDashboard({ mapboxToken, batches }: { mapboxToken
                 sub={`Samples collected: ${samplesCol} / ${totalBatches}`} />
             </div>
 
-            <div className="px-6 pt-3 space-y-2">
+            <div className="pt-3 space-y-2">
               {nonCompliant > 0 && (
                 <div className="rounded-lg border p-3 text-sm font-medium"
                   style={{ background: C.lightRed, borderColor: C.red, color: C.red }}>
-                  ⚠️ {nonCompliant} of {totalBatches} batches do not meet CSI Artisan Pro requirements.
+                  {nonCompliant} of {totalBatches} batches do not meet CSI Artisan Pro requirements.
                   See the Quality &amp; Compliance tab for details.
                 </div>
               )}
-              <div className="rounded-lg border p-3 text-sm"
-                style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
-                <strong>Systematic data gaps — all batches missing:</strong>{" "}
-                feedstock weight (no scales) · moisture readings (no meters) · temperature data (no sensors).
-                These prevent full CSI Artisan Pro compliance.
-              </div>
+              {systematicGaps.length > 0 && (
+                <div className="rounded-lg border p-3 text-sm"
+                  style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
+                  <strong>Systematic data gaps:</strong>{" "}
+                  all visible batches are missing {systematicGaps.join(", ")}.
+                  These gaps prevent full CSI Artisan Pro compliance.
+                </div>
+              )}
             </div>
 
-            <div className="px-6 mt-4 border-b overflow-x-auto" style={{ borderColor: C.metricBorder }}>
+            <ActionTracker />
+            <div className="mt-4 overflow-x-auto rounded-t-lg border-b bg-white px-2" style={{ borderColor: C.metricBorder }}>
               <div className="flex">
                 {TABS.map((t, i) => (
                   <TabButton key={i} active={activeTab === i} onClick={() => setActiveTab(i)}>{t}</TabButton>
@@ -258,29 +355,442 @@ export default function BiocharDashboard({ mapboxToken, batches }: { mapboxToken
               </div>
             </div>
 
-            <div className="px-6 py-4 space-y-4">
-              {activeTab === 0 && <Tab1 df={df} />}
+            <div className="rounded-b-lg bg-white px-4 py-4 space-y-4">
+              {activeTab === 0 && <Tab1 df={df} siteTrends={siteTrends} />}
               {activeTab === 1 && <Tab2 df={df} />}
               {activeTab === 2 && <Tab3 df={df} />}
               {activeTab === 3 && <Tab4 df={df} mapboxToken={mapboxToken} />}
               {activeTab === 4 && <Tab5 df={df} />}
               {activeTab === 5 && <Tab6 df={df} />}
               {activeTab === 6 && <Tab7 df={df} />}
+              {activeTab === 7 && <Tab8 df={df} dateFrom={dateFrom || firstDate} dateTo={dateTo || lastDate} />}
             </div>
           </>
         )}
-
-        <div className="px-6 py-3 text-xs border-t" style={{ color: C.subtext, borderColor: C.metricBorder }}>
-          SoilWatch dMRV — CP2 Pyrolysis Production module.
-        </div>
+        </main>
+      </div>
+      {showAi && <AiAssistant df={df} kpis={kpis} onClose={() => setShowAi(false)} />}
     </div>
   );
+}
+
+interface DashboardKpis {
+  totalBatches: number;
+  monthBatches: number;
+  weekBatches: number;
+  totalBiochar: number;
+  monthBiochar: number;
+  activeKilns: number;
+  totalKilns: number;
+  activeOps: number;
+  totalOps: number;
+  qualPassRate: number;
+  compFlagsN: number;
+  csiCompliant: number;
+  nonCompliant: number;
+  avgDuration: number;
+  minDuration: number;
+  maxDuration: number;
+  safetyInc: number;
+  samplesCol: number;
+}
+
+interface SnapshotItem {
+  severity: "Critical" | "Warning" | "Info";
+  type: string;
+  site: string;
+  detail: string;
+  action: string;
+}
+
+interface DecisionSnapshot {
+  critical: SnapshotItem[];
+  warnings: SnapshotItem[];
+  stableSites: { site: string; latestBatch: string; batches: number }[];
+  actions: { timing: string; site: string; action: string }[];
+}
+
+function computeDecisionSnapshot(df: Batch[]): DecisionSnapshot {
+  const critical: SnapshotItem[] = [];
+  const warnings: SnapshotItem[] = [];
+  const stableSites: { site: string; latestBatch: string; batches: number }[] = [];
+  const actions: { timing: string; site: string; action: string }[] = [];
+
+  df.forEach(batch => {
+    if (batch.safety_incidents.toLowerCase() !== "none") {
+      critical.push({
+        severity: "Critical",
+        type: "Safety incident",
+        site: batch.kiln_id,
+        detail: `Batch ${batch.batch_id} on ${fmtDate(batch.production_date)}: ${batch.safety_incidents}`,
+        action: "Review incident and confirm corrective action today.",
+      });
+    }
+
+    if (batch.compliance_fails > 0 && daysBetween(batch.production_date) <= COMPLIANCE_WINDOW_DAYS) {
+      critical.push({
+        severity: "Critical",
+        type: "CSI compliance failure",
+        site: batch.kiln_id,
+        detail: `Batch ${batch.batch_id}: ${batch.compliance_fails} requirement(s) failed`,
+        action: "Check evidence gaps and assign remediation today.",
+      });
+    }
+
+    if (batch.pyrolysis_duration_min < PYRO_MIN || batch.pyrolysis_duration_min > PYRO_MAX) {
+      warnings.push({
+        severity: "Warning",
+        type: "Duration out of range",
+        site: batch.kiln_id,
+        detail: `Batch ${batch.batch_id}: ${batch.pyrolysis_duration_min} min`,
+        action: "Check kiln operation and feed cycle notes today.",
+      });
+    }
+  });
+
+  const byKiln = new Map<string, Batch[]>();
+  df.forEach(batch => byKiln.set(batch.kiln_id, [...(byKiln.get(batch.kiln_id) ?? []), batch]));
+
+  byKiln.forEach((batches, kilnId) => {
+    const sorted = [...batches].sort((a, b) => b.production_date.localeCompare(a.production_date));
+    const last = sorted[0];
+    const idle = daysBetween(last.production_date);
+
+    if (idle > ACTIVE_WINDOW_DAYS) {
+      warnings.push({
+        severity: "Warning",
+        type: "Idle kiln",
+        site: kilnId,
+        detail: `No production for ${idle} days; last batch ${fmtDate(last.production_date)}`,
+        action: "Confirm production plan or document downtime this week.",
+      });
+    }
+
+    const recent = sorted.slice(0, 3);
+    if (recent.length >= 3 && recent.every(batch => batch.c_quality_acceptable && batch.compliance_fails <= 1)) {
+      stableSites.push({ site: kilnId, latestBatch: last.batch_id, batches: recent.length });
+    }
+  });
+
+  if (critical.length > 0) {
+    actions.push({ timing: "Today", site: "All flagged kilns", action: "Close safety and CSI evidence gaps." });
+  }
+  if (warnings.some(item => item.type === "Idle kiln")) {
+    actions.push({ timing: "This week", site: "Idle kilns", action: "Confirm field production plan or downtime reason." });
+  }
+  if (warnings.some(item => item.type === "Duration out of range")) {
+    actions.push({ timing: "Next batch", site: "Affected operators", action: "Review pyrolysis timing and feed cycle practice." });
+  }
+
+  return {
+    critical: critical.slice(0, 8),
+    warnings: warnings.slice(0, 8),
+    stableSites: stableSites.slice(0, 8),
+    actions,
+  };
+}
+
+interface SiteTrend {
+  site: string;
+  batches: number;
+  qualityRate: number;
+  csiRate: number;
+  durationRate: number;
+  daysIdle: number;
+  score: number;
+  trend: "Improving" | "Stable" | "Declining";
+  arrow: "↑" | "→" | "↓";
+  rag: "Green" | "Amber" | "Red";
+  rank: number;
+}
+
+function computeSiteTrends(df: Batch[]): SiteTrend[] {
+  const byKiln = new Map<string, Batch[]>();
+  df.forEach(b => byKiln.set(b.kiln_id, [...(byKiln.get(b.kiln_id) ?? []), b]));
+
+  const rows: Omit<SiteTrend, "rank">[] = [];
+
+  byKiln.forEach((batches, kiln) => {
+    const sorted = [...batches].sort((a, b) => a.production_date.localeCompare(b.production_date));
+    const n = sorted.length;
+    const qualityRate = n ? sorted.filter(b => b.c_quality_acceptable).length / n : 0.5;
+    const csiRate = n ? sorted.filter(b => b.csi_compliant).length / n : 0.5;
+    const durationRate = n ? sorted.filter(b => b.c_duration_in_range).length / n : 0.5;
+    const lastDate = sorted[n - 1]?.production_date ?? "";
+    const daysIdle = lastDate ? daysBetween(lastDate) : 30;
+    const activity = Math.max(0, 1 - daysIdle / 30);
+    const score = Math.round(qualityRate * 30 + csiRate * 30 + durationRate * 20 + activity * 20);
+
+    let trend: "Improving" | "Stable" | "Declining" = "Stable";
+    let arrow: "↑" | "→" | "↓" = "→";
+    if (n >= 4) {
+      const half = Math.floor(n / 2);
+      const earlyQ = sorted.slice(0, half).filter(b => b.c_quality_acceptable).length / half;
+      const earlyC = sorted.slice(0, half).filter(b => b.csi_compliant).length / half;
+      const recentQ = sorted.slice(half).filter(b => b.c_quality_acceptable).length / (n - half);
+      const recentC = sorted.slice(half).filter(b => b.csi_compliant).length / (n - half);
+      const delta = ((recentQ + recentC) - (earlyQ + earlyC)) / 2;
+      if (delta >= 0.1) { trend = "Improving"; arrow = "↑"; }
+      else if (delta <= -0.1) { trend = "Declining"; arrow = "↓"; }
+    }
+
+    const rag: "Green" | "Amber" | "Red" = score >= 70 ? "Green" : score >= 40 ? "Amber" : "Red";
+    rows.push({ site: kiln, batches: n, qualityRate, csiRate, durationRate, daysIdle, score, trend, arrow, rag });
+  });
+
+  return rows.sort((a, b) => b.score - a.score).map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+function SnapshotCard({ title, count, items, empty, tone }: {
+  title: string;
+  count: number;
+  items: string[];
+  empty: string;
+  tone: "critical" | "warning" | "stable" | "actions";
+}) {
+  const color = tone === "critical" ? C.red : tone === "warning" ? C.orange : tone === "stable" ? C.green : C.blue;
+  return (
+    <div className="rounded-lg border bg-white p-3" style={{ borderColor: C.metricBorder, borderTop: `4px solid ${color}` }}>
+      <div className="text-xs font-bold" style={{ color: C.title }}>{title}</div>
+      <div className="mt-1 text-2xl font-bold" style={{ color: C.title }}>{count}</div>
+      {items.length ? (
+        <ul className="mt-2 space-y-1 text-xs" style={{ color: C.subtext }}>
+          {items.slice(0, 3).map(item => <li key={item}>{item}</li>)}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs" style={{ color: C.subtext }}>{empty}</p>
+      )}
+    </div>
+  );
+}
+
+function DecisionSnapshotPanel({ snapshot }: { snapshot: DecisionSnapshot }) {
+  return (
+    <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <SnapshotCard
+        title="Critical Issues"
+        count={snapshot.critical.length}
+        items={snapshot.critical.map(item => `${item.site}: ${item.detail}`)}
+        empty="No immediate critical issues in current filters."
+        tone="critical"
+      />
+      <SnapshotCard
+        title="Warnings to Monitor"
+        count={snapshot.warnings.length}
+        items={snapshot.warnings.map(item => `${item.site}: ${item.detail}`)}
+        empty="No warning areas in current filters."
+        tone="warning"
+      />
+      <SnapshotCard
+        title="Stable Sites"
+        count={snapshot.stableSites.length}
+        items={snapshot.stableSites.map(item => `${item.site}: ${item.latestBatch} · ${item.batches} batch(es)`)}
+        empty="No kiln site currently qualifies as stable."
+        tone="stable"
+      />
+      <SnapshotCard
+        title="Urgent Actions"
+        count={snapshot.actions.length}
+        items={snapshot.actions.map(item => `${item.timing}: ${item.action} (${item.site})`)}
+        empty="No urgent actions generated for today or this week."
+        tone="actions"
+      />
+    </div>
+  );
+}
+
+function buildAiContext(df: Batch[], kpis: DashboardKpis): string {
+  const kilnRows = [...new Set(df.map(b => b.kiln_id))].map(kiln => {
+    const rows = df.filter(b => b.kiln_id === kiln);
+    const kg = rows.reduce((sum, batch) => sum + batch.biochar_wet_weight_kg, 0);
+    return `${kiln}: ${rows.length} batches, ${kg.toFixed(0)} kg`;
+  });
+
+  const operatorRows = [...new Set(df.map(b => b.operator_name))].map(operator => {
+    const rows = df.filter(b => b.operator_name === operator);
+    const kg = rows.reduce((sum, batch) => sum + batch.biochar_wet_weight_kg, 0);
+    const passRate = rows.length ? rows.filter(batch => batch.c_quality_acceptable).length / rows.length : 0;
+    return `${operator}: ${rows.length} batches, ${kg.toFixed(0)} kg, ${(passRate * 100).toFixed(0)}% pass rate`;
+  });
+
+  return [
+    `Total batches: ${kpis.totalBatches}`,
+    `Biochar produced: ${kpis.totalBiochar.toFixed(0)} kg`,
+    `This month: ${kpis.monthBatches} batches, ${kpis.monthBiochar.toFixed(0)} kg`,
+    `This week: ${kpis.weekBatches} batches`,
+    `Active kilns: ${kpis.activeKilns} of ${kpis.totalKilns}`,
+    `Active operators: ${kpis.activeOps} of ${kpis.totalOps}`,
+    `Quality pass rate: ${kpis.qualPassRate.toFixed(0)}%`,
+    `Compliance flags, last ${COMPLIANCE_WINDOW_DAYS} days: ${kpis.compFlagsN}`,
+    `Average pyrolysis: ${kpis.avgDuration.toFixed(0)} min, target ${PYRO_MIN}-${PYRO_MAX}`,
+    `Safety incidents: ${kpis.safetyInc}`,
+    `Per-kiln: ${kilnRows.join("; ")}`,
+    `Per-operator: ${operatorRows.join("; ")}`,
+  ].join("\n");
+}
+
+function AiAssistant({ df, kpis, onClose }: { df: Batch[]; kpis: DashboardKpis; onClose: () => void }) {
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function ask(question: string) {
+    if (!question.trim()) return;
+    const nextMessages = [...messages, { role: "user" as const, content: question.trim() }];
+    setMessages(nextMessages);
+    setPrompt("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/biochar/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: buildAiContext(df, kpis), messages: nextMessages }),
+      });
+      const data = await response.json();
+      setMessages([...nextMessages, { role: "assistant", content: data.answer ?? "No answer returned." }]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setMessages([...nextMessages, { role: "assistant", content: `AI request failed: ${message}` }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const suggestions = [
+    "Which kiln is most productive?",
+    "Which operator has the best quality?",
+    "How many batches this month?",
+    "Any safety concerns?",
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: C.metricBorder }}>
+          <h2 className="text-sm font-semibold" style={{ color: C.title }}>Ask AI</h2>
+          <button type="button" onClick={onClose} className="text-sm" style={{ color: C.subtext }}>Close</button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 px-4 pt-4">
+          {suggestions.map(question => (
+            <button
+              type="button"
+              key={question}
+              onClick={() => ask(question)}
+              className="rounded border px-3 py-2 text-xs text-left"
+              style={{ borderColor: C.metricBorder, color: C.title }}
+            >
+              {question}
+            </button>
+          ))}
+        </div>
+        <div className="m-4 h-64 overflow-auto rounded border p-3 text-sm" style={{ borderColor: C.metricBorder }}>
+          {messages.length === 0 ? (
+            <p style={{ color: C.subtext }}>Ask about the currently filtered ONA data.</p>
+          ) : messages.map((message, index) => (
+            <div key={`${message.role}-${index}`} className="mb-3">
+              <div className="text-xs font-semibold" style={{ color: message.role === "user" ? C.blue : C.green }}>
+                {message.role === "user" ? "You" : "Assistant"}
+              </div>
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            </div>
+          ))}
+          {loading && <p className="text-xs" style={{ color: C.subtext }}>Thinking...</p>}
+        </div>
+        <form
+          className="flex gap-2 border-t p-4"
+          style={{ borderColor: C.metricBorder }}
+          onSubmit={event => { event.preventDefault(); ask(prompt); }}
+        >
+          <input
+            value={prompt}
+            onChange={event => setPrompt(event.target.value)}
+            placeholder="Ask about your data..."
+            className="min-w-0 flex-1 rounded border px-3 py-2 text-sm"
+            style={{ borderColor: C.metricBorder }}
+          />
+          <button type="submit" disabled={loading} className="rounded px-4 py-2 text-sm font-semibold text-white" style={{ background: C.blue }}>
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function csvEscape(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadText(filename: string, mime: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildCsv(df: Batch[]): string {
+  const fields: (keyof Batch)[] = [
+    "batch_id", "production_date", "kiln_id", "operator_name", "feedstock_appearance",
+    "feedstock_volume_m3", "feedstock_weight_kg", "pyrolysis_duration_min",
+    "biochar_wet_weight_kg", "dry_kg", "biochar_visual_quality", "sample_collected",
+    "compliance_fails", "csi_compliant", "submission_time",
+  ];
+  return [
+    fields.join(","),
+    ...df.map(batch => fields.map(field => csvEscape(batch[field])).join(",")),
+  ].join("\n");
+}
+
+function buildReportHtml(df: Batch[], kpis: DashboardKpis, title: string, dateFrom: string, dateTo: string): string {
+  const notes = df
+    .filter(batch => !["", "none", "n/a", "nan"].includes(batch.operational_issues.trim().toLowerCase()) || batch.batch_notes.trim())
+    .map(batch => `<li><strong>${batch.batch_id} - ${fmtDate(batch.production_date)} - ${batch.operator_name}</strong><br>${batch.operational_issues || batch.batch_notes}</li>`)
+    .join("");
+
+  const rows = [
+    ["Total Batches", kpis.totalBatches],
+    ["This Month", kpis.monthBatches],
+    ["Biochar Produced (wet)", `${kpis.totalBiochar.toFixed(1)} kg`],
+    ["Active Kilns", `${kpis.activeKilns} / ${kpis.totalKilns}`],
+    ["Active Operators", `${kpis.activeOps} / ${kpis.totalOps}`],
+    ["Quality Pass Rate", `${kpis.qualPassRate.toFixed(1)}%`],
+    ["Compliance Flags", kpis.compFlagsN],
+    ["Avg Pyrolysis Duration", `${kpis.avgDuration.toFixed(0)} min`],
+    ["Safety Incidents", kpis.safetyInc],
+    ["Samples Collected", `${kpis.samplesCol} / ${kpis.totalBatches}`],
+  ];
+
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+body{font-family:Arial,sans-serif;color:#1F3864;margin:32px}
+table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #e5e7eb;padding:8px;text-align:left}
+th{background:#1F3864;color:white}.muted{color:#6b7280}.page-break{page-break-before:always}
+</style></head><body>
+<h1>${title}</h1>
+<p class="muted">Afar Prosopis Project - CARE Ethiopia | SoilWatch dMRV</p>
+<p>Period: ${dateFrom} to ${dateTo}<br>Generated: ${new Date().toLocaleString()}</p>
+<h2>1. Production Summary</h2>
+<table><tbody>${rows.map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join("")}</tbody></table>
+<h2>2. CSI Compliance Summary</h2>
+<p>${kpis.csiCompliant} compliant batch(es), ${kpis.nonCompliant} non-compliant batch(es).</p>
+<h2>3. Operational Notes</h2>
+${notes ? `<ul>${notes}</ul>` : "<p>No operational notes recorded in this period.</p>"}
+<h2>4. Batch Records</h2>
+<table><thead><tr><th>Batch</th><th>Date</th><th>Kiln</th><th>Operator</th><th>Wet kg</th><th>Quality</th><th>CSI fails</th></tr></thead>
+<tbody>${df.map(batch => `<tr><td>${batch.batch_id}</td><td>${batch.production_date}</td><td>${batch.kiln_id}</td><td>${batch.operator_name}</td><td>${batch.biochar_wet_weight_kg.toFixed(1)}</td><td>${batch.biochar_visual_quality}</td><td>${batch.compliance_fails}</td></tr>`).join("")}</tbody></table>
+<p class="muted">Dry biochar is estimated using ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture. tCO2e remains pending until CSI factors are confirmed.</p>
+</body></html>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TAB 1 — Production Overview
 // ═══════════════════════════════════════════════════════════════════════════
-function Tab1({ df }: { df: Batch[] }) {
+function Tab1({ df, siteTrends }: { df: Batch[]; siteTrends: SiteTrend[] }) {
   const kilnIds = [...new Set(df.map(b => b.kiln_id))].sort();
 
   // Daily timeline
@@ -411,6 +921,81 @@ function Tab1({ df }: { df: Batch[] }) {
             ))}</tbody>
           </table>
         </Panel>
+      </div>
+
+      {/* ── Site Performance Ranking ─────────────────────────────────────── */}
+      <div className="border-t pt-4 mt-2" style={{ borderColor: C.metricBorder }}>
+        <SectionTitle>Site Performance Ranking</SectionTitle>
+        <p className="text-xs mb-3" style={{ color: C.subtext }}>
+          Score 0–100: quality pass rate (30 pts) · CSI compliance (30 pts) · duration in range (20 pts) · recent activity (20 pts). &nbsp;
+          🟢 Stable ≥70 · 🟡 Monitor ≥40 · 🔴 Urgent &lt;40. Trend compares first vs second half of batches (needs ≥4).
+        </p>
+        {siteTrends.length > 0 && (
+          <>
+            <div className="flex flex-wrap gap-3 mb-4">
+              {siteTrends.map(r => {
+                const borderColor = r.rag === "Green" ? C.green : r.rag === "Amber" ? C.orange : C.red;
+                const ragLabel = r.rag === "Green" ? "🟢 Stable" : r.rag === "Amber" ? "🟡 Monitor" : "🔴 Urgent";
+                return (
+                  <div key={r.site}
+                    className="rounded-lg bg-white p-3 flex flex-col min-w-28 flex-1"
+                    style={{ border: `1px solid ${C.metricBorder}`, borderTop: `4px solid ${borderColor}` }}>
+                    <div className="text-[10px]" style={{ color: C.subtext }}>#{r.rank} · {ragLabel}</div>
+                    <div className="text-sm font-bold mt-0.5 truncate" style={{ color: C.title }}>{r.site}</div>
+                    <div className="text-3xl font-bold leading-tight mt-1" style={{ color: "#111827" }}>{r.score}</div>
+                    <div className="text-xl leading-tight">{r.arrow}</div>
+                    <div className="text-xs" style={{ color: "#374151" }}>{r.trend}</div>
+                    <div className="text-[10px] mt-1" style={{ color: C.subtext }}>{r.batches} batch(es) · {r.daysIdle}d idle</div>
+                  </div>
+                );
+              })}
+            </div>
+            <Panel>
+              <ResponsiveContainer width="100%" height={Math.max(160, siteTrends.length * 44 + 40)}>
+                <BarChart data={siteTrends} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 8 }}>
+                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v: unknown) => `${v as number}`} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="site" tick={{ fontSize: 11 }} width={60} />
+                  <Tooltip formatter={(v: unknown) => [`${v as number} / 100`, "Score"]} />
+                  <Bar dataKey="score" radius={[0, 4, 4, 0]}
+                    label={{ position: "right", fontSize: 10, formatter: (v: unknown) => `${v as number}` }}>
+                    {siteTrends.map((r, i) => (
+                      <Cell key={i} fill={r.rag === "Green" ? C.green : r.rag === "Amber" ? C.orange : C.red} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+            <Panel className="mt-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b" style={{ borderColor: C.metricBorder, color: C.subtext }}>
+                      {["Rank","Site","Score /100","Risk","Trend","Batches","Quality%","CSI%","Dur OK%","Days Idle"].map(h => (
+                        <th key={h} className={`py-1 pr-3 font-semibold ${["Rank","Score /100","Batches","Quality%","CSI%","Dur OK%","Days Idle"].includes(h) ? "text-right" : "text-left"}`}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {siteTrends.map(r => (
+                      <tr key={r.site} className="border-t" style={{ borderColor: C.metricBorder }}>
+                        <td className="py-1.5 pr-3 text-right">{r.rank}</td>
+                        <td className="py-1.5 pr-3 font-medium" style={{ color: C.title }}>{r.site}</td>
+                        <td className="py-1.5 pr-3 text-right font-bold">{r.score}</td>
+                        <td className="py-1.5 pr-3">{r.rag === "Green" ? "🟢 Stable" : r.rag === "Amber" ? "🟡 Monitor" : "🔴 Urgent"}</td>
+                        <td className="py-1.5 pr-3">{r.arrow} {r.trend}</td>
+                        <td className="py-1.5 pr-3 text-right">{r.batches}</td>
+                        <td className="py-1.5 pr-3 text-right">{(r.qualityRate * 100).toFixed(0)}%</td>
+                        <td className="py-1.5 pr-3 text-right">{(r.csiRate * 100).toFixed(0)}%</td>
+                        <td className="py-1.5 pr-3 text-right">{(r.durationRate * 100).toFixed(0)}%</td>
+                        <td className="py-1.5 text-right">{r.daysIdle}d</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          </>
+        )}
       </div>
 
       <SectionTitle>Feedstock &amp; Pyrolysis Detail</SectionTitle>
@@ -1180,6 +1765,20 @@ function Tab6({ df }: { df: Batch[] }) {
           </table>
         </div>
       </Panel>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="rounded px-4 py-2 text-sm font-semibold text-white"
+          style={{ background: C.green }}
+          onClick={() => downloadText(
+            `biochar_batches_${new Date().toISOString().slice(0, 10)}.csv`,
+            "text/csv",
+            buildCsv(df),
+          )}
+        >
+          Download CSV
+        </button>
+      </div>
     </div>
   );
 }
@@ -1372,6 +1971,283 @@ function Tab7({ df }: { df: Batch[] }) {
             ))}</tbody>
           </table>
         </div>
+      </Panel>
+    </div>
+  );
+}
+
+// ─── Action Tracker ────────────────────────────────────────────────────────
+interface ActionItem {
+  id: string;
+  issue: string;
+  action: string;
+  responsible: string;
+  deadline: string;
+  status: "Open" | "In Progress" | "Done";
+}
+
+function ActionTracker() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<ActionItem[]>([]);
+  const [form, setForm] = useState({ issue: "", action: "", responsible: "", deadline: "" });
+
+  // Load from localStorage after mount (SSR-safe)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("biochar_actions");
+      if (stored) setItems(JSON.parse(stored) as ActionItem[]);
+    } catch { /* ignore */ }
+  }, []);
+
+  function persist(next: ActionItem[]) {
+    setItems(next);
+    try { localStorage.setItem("biochar_actions", JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  function addItem() {
+    if (!form.issue.trim()) return;
+    persist([...items, { ...form, id: Date.now().toString(), status: "Open" }]);
+    setForm({ issue: "", action: "", responsible: "", deadline: "" });
+  }
+
+  const openCount = items.filter(it => it.status !== "Done").length;
+
+  return (
+    <div className="mb-4 rounded-lg border bg-white" style={{ borderColor: C.metricBorder }}>
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
+        style={{ color: C.title }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span>📋 Action Tracker — {openCount} open item{openCount !== 1 ? "s" : ""}</span>
+        <span className="text-xs" style={{ color: C.subtext }}>{open ? "▲ collapse" : "▼ expand"}</span>
+      </button>
+
+      {open && (
+        <div className="border-t px-4 pb-4" style={{ borderColor: C.metricBorder }}>
+          {items.length > 0 && (
+            <div className="overflow-x-auto mt-3 mb-4">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: C.metricBorder, color: C.subtext }}>
+                    {["Issue", "Action", "Owner", "Deadline", "Status", ""].map(h => (
+                      <th key={h} className="py-1 pr-3 text-left font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(it => (
+                    <tr key={it.id} className="border-t" style={{ borderColor: C.metricBorder }}>
+                      <td className="py-1.5 pr-3" style={{ color: it.status === "Done" ? C.subtext : C.title, textDecoration: it.status === "Done" ? "line-through" : "none" }}>{it.issue}</td>
+                      <td className="py-1.5 pr-3" style={{ color: C.subtext }}>{it.action}</td>
+                      <td className="py-1.5 pr-3 font-medium" style={{ color: C.title }}>{it.responsible}</td>
+                      <td className="py-1.5 pr-3" style={{ color: C.subtext }}>{it.deadline}</td>
+                      <td className="py-1.5 pr-3">
+                        <select
+                          value={it.status}
+                          onChange={e => persist(items.map(x => x.id === it.id ? { ...x, status: e.target.value as ActionItem["status"] } : x))}
+                          className="rounded border px-1.5 py-0.5 text-xs"
+                          style={{
+                            borderColor: it.status === "Done" ? C.green : it.status === "In Progress" ? C.orange : C.metricBorder,
+                            background: it.status === "Done" ? C.lightGreen : it.status === "In Progress" ? "#fffbeb" : "white",
+                            color: it.status === "Done" ? "#166534" : it.status === "In Progress" ? "#92400e" : C.title,
+                          }}
+                        >
+                          <option>Open</option>
+                          <option>In Progress</option>
+                          <option>Done</option>
+                        </select>
+                      </td>
+                      <td className="py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => persist(items.filter(x => x.id !== it.id))}
+                          className="rounded px-1.5 py-0.5 text-xs font-bold"
+                          style={{ background: C.lightRed, color: C.red }}
+                        >✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {items.length === 0 && (
+            <p className="mt-3 mb-2 text-xs" style={{ color: C.subtext }}>No actions yet. Add one below.</p>
+          )}
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2 items-end">
+            <input placeholder="Issue / observation" value={form.issue}
+              onChange={e => setForm(f => ({ ...f, issue: e.target.value }))}
+              className="col-span-1 xl:col-span-1 rounded border px-2 py-1.5 text-xs"
+              style={{ borderColor: C.metricBorder, color: C.title }} />
+            <input placeholder="Action to take" value={form.action}
+              onChange={e => setForm(f => ({ ...f, action: e.target.value }))}
+              className="rounded border px-2 py-1.5 text-xs"
+              style={{ borderColor: C.metricBorder, color: C.title }} />
+            <input placeholder="Owner" value={form.responsible}
+              onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
+              className="rounded border px-2 py-1.5 text-xs"
+              style={{ borderColor: C.metricBorder, color: C.title }} />
+            <input type="date" value={form.deadline}
+              onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
+              className="rounded border px-2 py-1.5 text-xs"
+              style={{ borderColor: C.metricBorder, color: C.title }} />
+            <button type="button" onClick={addItem}
+              className="rounded px-3 py-1.5 text-xs font-semibold text-white"
+              style={{ background: C.blue }}>
+              + Add action
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB 8 — Export Report
+// ═══════════════════════════════════════════════════════════════════════════
+function Tab8({ df, dateFrom, dateTo }: { df: Batch[]; dateFrom: string; dateTo: string }) {
+  const [title, setTitle] = useState("Afar Prosopis Biochar Project Production Report");
+  const [reportFrom, setReportFrom] = useState(dateFrom);
+  const [reportTo, setReportTo] = useState(dateTo);
+
+  const reportDf = useMemo(() => df.filter(batch =>
+    (!reportFrom || batch.production_date >= reportFrom) &&
+    (!reportTo || batch.production_date <= reportTo)
+  ), [df, reportFrom, reportTo]);
+
+  const reportKpis = useMemo<DashboardKpis>(() => {
+    const totalBatches = reportDf.length;
+    const monthBatches = reportDf.filter(b => b.production_date >= daysAgo(30)).length;
+    const weekBatches = reportDf.filter(b => b.production_date >= daysAgo(7)).length;
+    const totalBiochar = reportDf.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
+    const monthBiochar = reportDf.filter(b => b.production_date >= daysAgo(30)).reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
+    const activeCutoff = daysAgo(ACTIVE_WINDOW_DAYS);
+    const activeKilns = new Set(reportDf.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size;
+    const totalKilns = new Set(reportDf.map(b => b.kiln_id)).size;
+    const activeOps = new Set(reportDf.filter(b => b.production_date >= activeCutoff).map(b => b.operator_name)).size;
+    const totalOps = new Set(reportDf.map(b => b.operator_name)).size;
+    const qualPassRate = reportDf.length ? (reportDf.filter(b => b.c_quality_acceptable).length / reportDf.length) * 100 : 0;
+    const compFlagsN = reportDf.filter(b => b.production_date >= daysAgo(COMPLIANCE_WINDOW_DAYS) && b.compliance_fails > 0).length;
+    const csiCompliant = reportDf.filter(b => b.csi_compliant).length;
+    const avgDuration = reportDf.length ? reportDf.reduce((s, b) => s + b.pyrolysis_duration_min, 0) / reportDf.length : 0;
+    const minDuration = reportDf.length ? Math.min(...reportDf.map(b => b.pyrolysis_duration_min)) : 0;
+    const maxDuration = reportDf.length ? Math.max(...reportDf.map(b => b.pyrolysis_duration_min)) : 0;
+    const safetyInc = reportDf.filter(b => b.safety_incidents.toLowerCase() !== "none").length;
+    const samplesCol = reportDf.filter(b => b.c_sample_collected).length;
+
+    return {
+      totalBatches, monthBatches, weekBatches, totalBiochar, monthBiochar,
+      activeKilns, totalKilns, activeOps, totalOps, qualPassRate, compFlagsN,
+      csiCompliant, nonCompliant: totalBatches - csiCompliant,
+      avgDuration, minDuration, maxDuration, safetyInc, samplesCol,
+    };
+  }, [reportDf]);
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle>Export Report</SectionTitle>
+      <Panel>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <label className="flex flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+            Report title
+            <input
+              value={title}
+              onChange={event => setTitle(event.target.value)}
+              className="rounded border px-3 py-2 text-sm font-normal"
+              style={{ borderColor: C.metricBorder, color: C.title }}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+            Date from
+            <input
+              type="date"
+              value={reportFrom}
+              onChange={event => setReportFrom(event.target.value)}
+              className="rounded border px-3 py-2 text-sm font-normal"
+              style={{ borderColor: C.metricBorder, color: C.title }}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-semibold" style={{ color: C.subtext }}>
+            Date to
+            <input
+              type="date"
+              value={reportTo}
+              onChange={event => setReportTo(event.target.value)}
+              className="rounded border px-3 py-2 text-sm font-normal"
+              style={{ borderColor: C.metricBorder, color: C.title }}
+            />
+          </label>
+        </div>
+        <p className="mt-3 text-sm" style={{ color: C.subtext }}>
+          Batches in report: <strong style={{ color: C.title }}>{reportDf.length}</strong>
+        </p>
+      </Panel>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Panel>
+          <h3 className="text-sm font-semibold" style={{ color: C.title }}>Filtered Data CSV</h3>
+          <p className="mt-1 text-xs" style={{ color: C.subtext }}>
+            Exports the currently selected ONA submissions and computed compliance fields.
+          </p>
+          <button
+            type="button"
+            className="mt-3 rounded px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: C.green }}
+            onClick={() => downloadText(`biochar_batches_${new Date().toISOString().slice(0, 10)}.csv`, "text/csv", buildCsv(reportDf))}
+          >
+            Download CSV
+          </button>
+        </Panel>
+
+        <Panel>
+          <h3 className="text-sm font-semibold" style={{ color: C.title }}>Formatted Report</h3>
+          <p className="mt-1 text-xs" style={{ color: C.subtext }}>
+            Creates a printable HTML report with the same content sections as the Streamlit report export.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded px-4 py-2 text-sm font-semibold text-white"
+              style={{ background: C.blue }}
+              onClick={() => downloadText(
+                `biochar_report_${new Date().toISOString().slice(0, 10)}.html`,
+                "text/html",
+                buildReportHtml(reportDf, reportKpis, title, reportFrom, reportTo),
+              )}
+            >
+              Download HTML Report
+            </button>
+            <button
+              type="button"
+              className="rounded border px-4 py-2 text-sm font-semibold"
+              style={{ borderColor: C.metricBorder, color: C.title }}
+              onClick={() => {
+                const html = buildReportHtml(reportDf, reportKpis, title, reportFrom, reportTo);
+                const win = window.open("", "_blank");
+                if (win) {
+                  win.document.write(html);
+                  win.document.close();
+                  win.print();
+                }
+              }}
+            >
+              Print / Save PDF
+            </button>
+          </div>
+        </Panel>
+      </div>
+
+      <Panel>
+        <h3 className="text-sm font-semibold" style={{ color: C.title }}>Included Sections</h3>
+        <ul className="mt-2 list-disc pl-5 text-sm" style={{ color: C.subtext }}>
+          <li>Cover information, project name, report date range, and generation timestamp</li>
+          <li>KPI summary table using the filtered ONA submissions</li>
+          <li>CSI compliance summary and operational notes</li>
+          <li>Batch-level production records and data caveats</li>
+        </ul>
       </Panel>
     </div>
   );

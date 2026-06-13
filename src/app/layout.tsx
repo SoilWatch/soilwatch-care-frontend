@@ -4,7 +4,7 @@ import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
   title: "CARE dMRV | SoilWatch",
-  description: "Prosopis & Biochar digital MRV Platform — CARE / SoilWatch",
+  description: "Afar Prosopis Biochar digital MRV platform — CARE / SoilWatch",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

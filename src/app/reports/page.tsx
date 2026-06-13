@@ -3,8 +3,8 @@ import Badge from "@/components/Badge";
 import { FileText, Lock } from "lucide-react";
 
 const reports = [
-  { title: "Quarterly Prosopis Coverage Report", status: "Template", standard: null },
-  { title: "Biochar Production Summary", status: "Available from CSV", standard: null },
+  { title: "Quarterly Project Coverage Report", status: "Template", standard: null },
+  { title: "Project Production Summary", status: "Available from ONA", standard: null },
   { title: "VM0044 Carbon Accounting", status: "Pending factors", standard: "VM0044" },
   { title: "CSI C-Sink Compliance Report", status: "Pending sensors", standard: "CSI C-Sink" },
 ];
@@ -12,11 +12,11 @@ const reports = [
 export default function ReportsPage() {
   return (
     <div className="min-h-full bg-white">
-      <PageHeader title="Reports" description="Monitoring, verification, and compliance report workspace" />
+      <PageHeader title="Project Reports" description="Monitoring, verification, and compliance reports for the Afar Prosopis Biochar project" />
 
       <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         {reports.map((report) => {
-          const available = report.status === "Available from CSV";
+          const available = report.status === "Available from ONA";
           return (
             <section key={report.title} className="bg-white rounded-lg border p-4" style={{ borderColor: "#e9ecef", opacity: available ? 1 : 0.78 }}>
               <div className="flex items-start justify-between gap-3">

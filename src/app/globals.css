@@ -3,49 +3,81 @@
 
 :root {
   /* SoilWatch brand tokens */
-  --earth-gold:        #f9c349;
-  --earth-gold-strong: #ffb100;
-  --earth-700:         #8d5908;
-  --soil-dark:         #1e1810;
-  --soil-copy:         #62615c;
-  --stone:             #f8f7f3;
-  --stone-deep:        #efede6;
-  --panel:             #fffdf8;
-  --carbon:            #4b4f58;
+  --earth-gold:        #f59e0b;
+  --earth-gold-strong: #d97706;
+  --earth-700:         #92400e;
+  --soil-dark:         #0f172a;
+  --soil-copy:         #64748b;
+  --stone:             #f8fafc;
+  --stone-deep:        #f1f5f9;
+  --panel:             #ffffff;
+  --carbon:            #6366f1;
+
+  /* Design system */
+  --sw-navy:    #0f172a;
+  --sw-blue:    #3b82f6;
+  --sw-gold:    #f59e0b;
+  --sw-green:   #10b981;
+  --sw-red:     #ef4444;
+  --bg:         #f8fafc;
+  --surface:    #ffffff;
+  --border:     #e2e8f0;
+  --text:       #0f172a;
+  --muted:      #64748b;
+  --sidebar-bg: #0f172a;
 }
 
 @theme inline {
-  --color-earth-50:    rgb(255 249 233);
-  --color-earth-100:   rgb(255 240 191);
-  --color-earth-200:   rgb(254 224 143);
-  --color-earth-300:   #f9c349;
-  --color-earth-400:   #ffb100;
-  --color-earth-600:   #b97600;
-  --color-earth-700:   #8d5908;
+  --color-earth-50:    rgb(255 251 235);
+  --color-earth-100:   rgb(254 243 199);
+  --color-earth-200:   rgb(253 230 138);
+  --color-earth-300:   #fcd34d;
+  --color-earth-400:   #f59e0b;
+  --color-earth-600:   #d97706;
+  --color-earth-700:   #92400e;
 
-  --color-soil-50:     rgb(248 247 243);
-  --color-soil-100:    rgb(239 237 230);
-  --color-soil-200:    rgb(221 217 208);
-  --color-soil-300:    rgb(193 188 176);
-  --color-soil-400:    rgb(151 146 132);
-  --color-soil-500:    rgb(122 118 109);
-  --color-soil-600:    #62615c;
-  --color-soil-700:    #4b4f58;
-  --color-soil-800:    rgb(49 44 37);
-  --color-soil-900:    #1e1810;
+  --color-soil-50:     rgb(248 250 252);
+  --color-soil-100:    rgb(241 245 249);
+  --color-soil-200:    rgb(226 232 240);
+  --color-soil-300:    rgb(203 213 225);
+  --color-soil-400:    rgb(148 163 184);
+  --color-soil-500:    rgb(100 116 139);
+  --color-soil-600:    #64748b;
+  --color-soil-700:    #475569;
+  --color-soil-800:    rgb(30 41 59);
+  --color-soil-900:    #0f172a;
 
-  --color-panel:       #fffdf8;
-  --color-stone-soft:  #f8f7f3;
-  --color-stone-deep:  #efede6;
+  --color-panel:       #ffffff;
+  --color-stone-soft:  #f8fafc;
+  --color-stone-deep:  #f1f5f9;
 }
 
 body {
-  background: var(--stone);
-  color: var(--soil-dark);
+  background: var(--bg);
+  color: var(--text);
   font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d4c9b0; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Mapbox popup overrides */
+.sw-popup .mapboxgl-popup-content {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 10px 12px;
+}
+.sw-popup .mapboxgl-popup-tip {
+  border-top-color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+.mapboxgl-popup-content {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 10px 12px;
+}

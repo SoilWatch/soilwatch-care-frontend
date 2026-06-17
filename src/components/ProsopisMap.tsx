@@ -108,10 +108,8 @@ export default function ProsopisMap({ mapboxToken }: ProsopisMapProps) {
     });
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-    map.addControl(
-      new mapboxgl.AttributionControl({ compact: true }),
-      "bottom-right"
-    );
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 100, unit: "metric" }), "bottom-left");
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
 
     map.on("load", () => {
       // ── Invasion extent fill ──────────────────────────────────────────────
@@ -122,8 +120,8 @@ export default function ProsopisMap({ mapboxToken }: ProsopisMapProps) {
         type: "fill",
         source: "invasion",
         paint: {
-          "fill-color": "#ffb100",
-          "fill-opacity": 0.35,
+          "fill-color": "#f59e0b",
+          "fill-opacity": 0.30,
         },
       });
 
@@ -166,13 +164,13 @@ export default function ProsopisMap({ mapboxToken }: ProsopisMapProps) {
         const feat = e.features?.[0];
         if (!feat) return;
         const props = feat.properties as { label: string; area_ha: number };
-        new mapboxgl.Popup({ closeButton: false, offset: 8 })
+        new mapboxgl.Popup({ closeButton: false, offset: 8, className: "sw-popup" })
           .setLngLat(e.lngLat)
           .setHTML(
-            `<div style="font-family:system-ui;font-size:12px;padding:4px 2px">
-              <p style="font-weight:600;color:#1e1810;margin:0 0 2px">${props.label}</p>
-              <p style="color:#62615c;margin:0">${props.area_ha.toLocaleString()} ha mapped</p>
-             </div>`
+            `<div style="font-family:system-ui;font-size:12px;min-width:130px">
+              <p style="font-weight:700;color:#0f172a;margin:0 0 4px;font-size:13px">${props.label}</p>
+              <p style="color:#64748b;margin:0">${props.area_ha.toLocaleString()} ha · invasion extent</p>
+            </div>`
           )
           .addTo(map);
       });
@@ -189,13 +187,13 @@ export default function ProsopisMap({ mapboxToken }: ProsopisMapProps) {
         const feat = e.features?.[0];
         if (!feat) return;
         const props = feat.properties as { label: string; area_ha: number };
-        new mapboxgl.Popup({ closeButton: false, offset: 8 })
+        new mapboxgl.Popup({ closeButton: false, offset: 8, className: "sw-popup" })
           .setLngLat(e.lngLat)
           .setHTML(
-            `<div style="font-family:system-ui;font-size:12px;padding:4px 2px">
-              <p style="font-weight:600;color:#1e1810;margin:0 0 2px">Harvesting ${props.label}</p>
-              <p style="color:#62615c;margin:0">${props.area_ha} ha cleared</p>
-             </div>`
+            `<div style="font-family:system-ui;font-size:12px;min-width:130px">
+              <p style="font-weight:700;color:#0f172a;margin:0 0 4px;font-size:13px">Harvesting ${props.label}</p>
+              <p style="color:#10b981;font-weight:600;margin:0">${props.area_ha} ha cleared</p>
+            </div>`
           )
           .addTo(map);
       });

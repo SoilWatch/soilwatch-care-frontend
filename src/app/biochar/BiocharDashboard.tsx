@@ -19,19 +19,19 @@ const KilnMapClient = dynamic(() => import("./KilnMapClient"), { ssr: false });
 
 // ── Colour palette ─────────────────────────────────────────────────────────
 const C = {
-  title:       "#1F3864",
-  heading:     "#2E75B6",
-  metricBg:    "#f8f9fa",
-  metricBorder:"#e9ecef",
-  photoBorder: "#e5e7eb",
-  red:         "#E74C3C",
-  lightRed:    "#FADBD8",
-  green:       "#27AE60",
-  lightGreen:  "#D5F5E3",
-  midGreen:    "#52BE80",
-  orange:      "#F39C12",
-  blue:        "#2E75B6",
-  subtext:     "#6b7280",
+  title:       "#0f172a",
+  heading:     "#3b82f6",
+  metricBg:    "#f8fafc",
+  metricBorder:"#e2e8f0",
+  photoBorder: "#e2e8f0",
+  red:         "#ef4444",
+  lightRed:    "#fee2e2",
+  green:       "#10b981",
+  lightGreen:  "#d1fae5",
+  midGreen:    "#34d399",
+  orange:      "#f59e0b",
+  blue:        "#3b82f6",
+  subtext:     "#64748b",
 };
 const SET2_COLORS = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494", "#b3b3b3"];
 const OP_COLORS = SET2_COLORS.slice(2);
@@ -48,27 +48,33 @@ const SMOKE_COLORS: Record<string, string> = {
 // ── UI primitives ───────────────────────────────────────────────────────────
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white border rounded-lg p-4 ${className}`} style={{ borderColor: C.metricBorder }}>
+    <div className={`bg-white border rounded-xl shadow-sm p-4 ${className}`} style={{ borderColor: C.metricBorder }}>
       {children}
     </div>
   );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="font-semibold mb-1 mt-4 text-base" style={{ color: C.heading }}>{children}</h3>;
+  return (
+    <h3 className="text-[10px] font-bold uppercase tracking-widest mb-3 mt-4" style={{ color: "#94a3b8" }}>
+      {children}
+    </h3>
+  );
 }
 
 function MetricCard({
   label, value, sub, flag,
 }: { label: string; value: string | number; sub?: string; flag?: boolean }) {
   return (
-    <div className="rounded-lg border p-3 flex flex-col gap-1"
-      style={{ background: C.metricBg, borderColor: C.metricBorder }}>
-      <div className="text-xs font-semibold" style={{ color: C.subtext }}>{label}</div>
-      <div className="text-2xl font-bold" style={{ color: flag ? C.red : C.title }}>
-        {flag && "⚠️ "}{value}
+    <div className="rounded-xl border overflow-hidden bg-white" style={{ borderColor: C.metricBorder }}>
+      <div className="h-0.5" style={{ background: flag ? C.red : C.blue }} />
+      <div className="p-3">
+        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#94a3b8" }}>{label}</div>
+        <div className="text-xl font-bold mt-0.5" style={{ color: flag ? C.red : C.title }}>
+          {flag && "⚠️ "}{value}
+        </div>
+        {sub && <div className="text-[11px] mt-0.5" style={{ color: C.subtext }}>{sub}</div>}
       </div>
-      {sub && <div className="text-xs" style={{ color: C.subtext }}>{sub}</div>}
     </div>
   );
 }
@@ -79,11 +85,10 @@ function TabButton({ active, onClick, children }: {
   return (
     <button
       onClick={onClick}
-      className="px-4 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+      className="px-4 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all"
       style={{
-        borderBottomColor: active ? C.blue : "transparent",
-        color: active ? C.blue : C.subtext,
-        background: "none",
+        background: active ? C.title : "transparent",
+        color: active ? "#ffffff" : C.subtext,
       }}
     >
       {children}
@@ -195,19 +200,19 @@ export default function BiocharDashboard({
       <header className="border-b bg-white px-6 py-4" style={{ borderColor: C.metricBorder }}>
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.subtext }}>
-              Afar Prosopis Biochar Project
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#f59e0b" }}>
+              Afar Prosopis Biochar Project · CP2 Pyrolysis
             </p>
-            <h1 className="text-2xl font-bold" style={{ color: C.title }}>Production Dashboard</h1>
+            <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.title }}>Production Dashboard</h1>
             <p className="mt-1 text-sm" style={{ color: C.subtext }}>
-              CP2 pyrolysis production from Prosopis removal - CARE Ethiopia | SoilWatch dMRV
+              CARE Ethiopia · SoilWatch dMRV · Live ONA submissions
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <button
               type="button"
               onClick={() => setShowSnapshot(prev => !prev)}
-              className="rounded border bg-white px-3 py-1.5 font-semibold"
+              className="rounded-lg border bg-white px-3 py-1.5 font-semibold transition-colors hover:bg-slate-50"
               style={{ borderColor: C.metricBorder, color: C.title }}
             >
               Decision Snapshot
@@ -215,33 +220,33 @@ export default function BiocharDashboard({
             <button
               type="button"
               onClick={() => setShowAi(true)}
-              className="rounded border px-3 py-1.5 font-semibold"
-              style={{ borderColor: C.blue, background: C.blue, color: "white" }}
+              className="rounded-lg px-3 py-1.5 font-semibold text-white transition-colors"
+              style={{ background: C.blue }}
             >
               Ask AI
             </button>
-            <span className="rounded border bg-white px-3 py-1.5 font-semibold" style={{ borderColor: C.metricBorder, color: C.title }}>
+            <span className="rounded-lg border bg-white px-3 py-1.5 font-semibold" style={{ borderColor: C.metricBorder, color: C.title }}>
               {dataStatus}
             </span>
             {dataSource?.formId && (
-              <span className="rounded border bg-white px-3 py-1.5" style={{ borderColor: C.metricBorder, color: C.subtext }}>
+              <span className="rounded-lg border bg-white px-3 py-1.5" style={{ borderColor: C.metricBorder, color: C.subtext }}>
                 ONA form {dataSource.formId}
               </span>
             )}
-            <span className="rounded border bg-white px-3 py-1.5" style={{ borderColor: C.metricBorder, color: C.subtext }}>
+            <span className="rounded-lg border bg-white px-3 py-1.5" style={{ borderColor: C.metricBorder, color: C.subtext }}>
               Loaded {loadedAt}
             </span>
           </div>
         </div>
         {dataSource?.error && (
-          <div className="mt-3 rounded border px-3 py-2 text-sm" style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
+          <div className="mt-3 rounded-lg border px-3 py-2 text-sm" style={{ background: C.lightRed, borderColor: C.red, color: "#991b1b" }}>
             {dataSource.error}
           </div>
         )}
       </header>
 
       <div className="p-4">
-        <section className="mb-4 rounded-lg border bg-white p-3" style={{ borderColor: C.metricBorder }}>
+        <section className="mb-4 rounded-xl border bg-white p-3 shadow-sm" style={{ borderColor: C.metricBorder }}>
           <div className="flex flex-wrap items-end gap-3">
             <div className="mr-auto">
               <h2 className="text-sm font-semibold" style={{ color: C.title }}>Filters</h2>
@@ -302,7 +307,7 @@ export default function BiocharDashboard({
 
         <main className="min-w-0">
           {totalBatches === 0 ? (
-            <div className="rounded-lg border bg-white p-4 text-sm" style={{ borderColor: C.orange, color: "#92400e" }}>
+            <div className="rounded-xl border bg-white p-4 text-sm shadow-sm" style={{ borderColor: C.orange, color: "#92400e" }}>
               {dataSource?.error ? "No ONA data is available until the connection issue is fixed." : "No batches match the current filters."}
             </div>
           ) : (
@@ -330,14 +335,14 @@ export default function BiocharDashboard({
 
             <div className="pt-3 space-y-2">
               {nonCompliant > 0 && (
-                <div className="rounded-lg border p-3 text-sm font-medium"
-                  style={{ background: C.lightRed, borderColor: C.red, color: C.red }}>
+                <div className="rounded-xl border p-3 text-sm font-medium"
+                  style={{ background: C.lightRed, borderColor: C.red, color: "#991b1b" }}>
                   {nonCompliant} of {totalBatches} batches do not meet CSI Artisan Pro requirements.
                   See the Quality &amp; Compliance tab for details.
                 </div>
               )}
               {systematicGaps.length > 0 && (
-                <div className="rounded-lg border p-3 text-sm"
+                <div className="rounded-xl border p-3 text-sm"
                   style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
                   <strong>Systematic data gaps:</strong>{" "}
                   all visible batches are missing {systematicGaps.join(", ")}.
@@ -347,15 +352,15 @@ export default function BiocharDashboard({
             </div>
 
             <ActionTracker />
-            <div className="mt-4 overflow-x-auto rounded-t-lg border-b bg-white px-2" style={{ borderColor: C.metricBorder }}>
-              <div className="flex">
+            <div className="mt-4 mb-2 overflow-x-auto">
+              <div className="inline-flex gap-1 p-1 rounded-xl" style={{ background: C.metricBg, border: `1px solid ${C.metricBorder}` }}>
                 {TABS.map((t, i) => (
                   <TabButton key={i} active={activeTab === i} onClick={() => setActiveTab(i)}>{t}</TabButton>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-b-lg bg-white px-4 py-4 space-y-4">
+            <div className="rounded-xl bg-white border px-4 py-4 space-y-4" style={{ borderColor: C.metricBorder }}>
               {activeTab === 0 && <Tab1 df={df} siteTrends={siteTrends} />}
               {activeTab === 1 && <Tab2 df={df} />}
               {activeTab === 2 && <Tab3 df={df} />}

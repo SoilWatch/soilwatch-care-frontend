@@ -41,13 +41,14 @@ export default function KilnMap({ mapboxToken, batches }: KilnMapProps) {
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: "mapbox://styles/mapbox/satellite-streets-v12",
       center,
       zoom: validBatches.length ? 11 : 9,
       attributionControl: false,
     });
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 100, unit: "metric" }), "bottom-left");
     map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
 
     const kilnStats: Record<string, { totalKg: number; batches: number; latSum: number; lonSum: number }> = {};
@@ -202,16 +203,19 @@ export default function KilnMap({ mapboxToken, batches }: KilnMapProps) {
           label: string; location: string; totalKg: number; batches: number;
         };
         const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
-        new mapboxgl.Popup({ closeButton: false, offset: 12 })
+        new mapboxgl.Popup({ closeButton: false, offset: 12, className: "sw-popup" })
           .setLngLat(coords)
           .setHTML(
-            `<div style="font-family:system-ui;font-size:12px;padding:2px 0">
-              <p style="font-weight:700;color:${C.title};margin:0 0 4px">${p.label}</p>
-              <p style="color:${C.subtext};margin:0 0 2px">${p.location}</p>
-              <p style="color:${C.heading};font-weight:600;margin:0 0 2px">
-                ${p.totalKg.toLocaleString()} kg produced
-              </p>
-              <p style="color:${C.subtext};margin:0">${p.batches} batches</p>
+            `<div style="font-family:system-ui;font-size:12px;min-width:140px">
+              <p style="font-weight:700;color:#0f172a;margin:0 0 6px;font-size:13px">${p.label}</p>
+              <div style="display:flex;justify-content:space-between;margin:0 0 2px">
+                <span style="color:#64748b">Output</span>
+                <span style="font-weight:600;color:#0f172a">${p.totalKg.toLocaleString()} kg</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="color:#64748b">Batches</span>
+                <span style="font-weight:600;color:#0f172a">${p.batches}</span>
+              </div>
             </div>`
           )
           .addTo(map);
@@ -224,14 +228,14 @@ export default function KilnMap({ mapboxToken, batches }: KilnMapProps) {
           batch_id: string; source: string; condition: string; volume: number;
         };
         const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
-        new mapboxgl.Popup({ closeButton: false, offset: 12 })
+        new mapboxgl.Popup({ closeButton: false, offset: 12, className: "sw-popup" })
           .setLngLat(coords)
           .setHTML(
-            `<div style="font-family:system-ui;font-size:12px;padding:2px 0">
-              <p style="font-weight:700;color:${C.title};margin:0 0 4px">Feedstock source</p>
-              <p style="color:${C.subtext};margin:0 0 2px">Batch: ${p.batch_id}</p>
-              <p style="color:${C.subtext};margin:0 0 2px">${p.source || "No source description"}</p>
-              <p style="color:${C.heading};margin:0">${p.condition} · ${p.volume} m3</p>
+            `<div style="font-family:system-ui;font-size:12px;min-width:140px">
+              <p style="font-weight:700;color:#0f172a;margin:0 0 6px;font-size:13px">Feedstock Source</p>
+              <p style="color:#64748b;margin:0 0 2px">Batch: ${p.batch_id}</p>
+              <p style="color:#0f172a;margin:0 0 2px">${p.source || "No source description"}</p>
+              <p style="color:#64748b;margin:0">${p.condition} · ${p.volume} m³</p>
             </div>`
           )
           .addTo(map);

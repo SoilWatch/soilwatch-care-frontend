@@ -63,10 +63,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function MetricCard({
-  label, value, sub, flag,
-}: { label: string; value: string | number; sub?: string; flag?: boolean }) {
-  return (
-    <div className="rounded-xl border overflow-hidden bg-white" style={{ borderColor: C.metricBorder }}>
+  label, value, sub, flag, onClick,
+}: { label: string; value: string | number; sub?: string; flag?: boolean; onClick?: () => void }) {
+  const content = (
+    <>
       <div className="h-0.5" style={{ background: flag ? C.red : C.blue }} />
       <div className="p-3">
         <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#94a3b8" }}>{label}</div>
@@ -75,6 +75,18 @@ function MetricCard({
         </div>
         {sub && <div className="text-[11px] mt-0.5" style={{ color: C.subtext }}>{sub}</div>}
       </div>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="rounded-xl border overflow-hidden bg-white text-left w-full transition-opacity hover:opacity-80" style={{ borderColor: C.metricBorder }}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-xl border overflow-hidden bg-white" style={{ borderColor: C.metricBorder }}>
+      {content}
     </div>
   );
 }
@@ -173,6 +185,8 @@ export default function BiocharDashboard({
   };
   const snapshot = useMemo(() => computeDecisionSnapshot(df), [df]);
   const siteTrends = useMemo(() => computeSiteTrends(df), [df]);
+  const operatorScores = useMemo(() => computeOperatorScores(df), [df]);
+  const [drillFilter, setDrillFilter] = useState<string | null>(null);
 
   const dataStatus = dataSource?.error ? "ONA unavailable" : "Live ONA";
   const loadedAt = dataSource?.loadedAt
@@ -320,7 +334,8 @@ export default function BiocharDashboard({
               <MetricCard label="Biochar Produced" value={`${totalBiochar.toFixed(0)} kg`}
                 sub={`This month: ${monthBiochar.toFixed(0)} kg`} />
               <MetricCard label="Active Kilns" value={`${activeKilns} / ${totalKilns}`}
-                sub={totalKilns - activeKilns === 0 ? "All active" : `${totalKilns - activeKilns} idle`} />
+                sub={totalKilns - activeKilns === 0 ? "All active" : `${totalKilns - activeKilns} idle · Click to drill through`}
+                onClick={() => { setDrillFilter("idle_kilns"); setActiveTab(2); }} />
               <MetricCard label="Active Operators" value={`${activeOps} / ${totalOps}`}
                 sub={`Last ${ACTIVE_WINDOW_DAYS}-day window`} />
               <MetricCard label="Quality Pass Rate" value={`${qualPassRate.toFixed(0)}%`}
@@ -330,7 +345,8 @@ export default function BiocharDashboard({
               <MetricCard label="Avg Pyrolysis Duration" value={`${avgDuration.toFixed(0)} min`}
                 sub={`Range: ${minDuration}–${maxDuration} min`} flag={durationFlag} />
               <MetricCard label="Safety Incidents" value={safetyInc}
-                sub={`Samples collected: ${samplesCol} / ${totalBatches}`} />
+                sub={`Samples collected: ${samplesCol} / ${totalBatches} · Click to drill through`}
+                onClick={() => { setDrillFilter("safety_incidents"); setActiveTab(2); }} />
             </div>
 
             <div className="pt-3 space-y-2">
@@ -361,10 +377,10 @@ export default function BiocharDashboard({
             </div>
 
             <div className="rounded-xl bg-white border px-4 py-4 space-y-4" style={{ borderColor: C.metricBorder }}>
-              {activeTab === 0 && <Tab1 df={df} siteTrends={siteTrends} />}
+              {activeTab === 0 && <Tab1 df={df} siteTrends={siteTrends} operatorScores={operatorScores} />}
               {activeTab === 1 && <Tab2 df={df} />}
-              {activeTab === 2 && <Tab3 df={df} />}
-              {activeTab === 3 && <Tab4 df={df} mapboxToken={mapboxToken} />}
+              {activeTab === 2 && <Tab3 df={df} drillFilter={drillFilter} onClearDrill={() => setDrillFilter(null)} />}
+              {activeTab === 3 && <Tab4 df={df} mapboxToken={mapboxToken} siteTrends={siteTrends} />}
               {activeTab === 4 && <Tab5 df={df} />}
               {activeTab === 5 && <Tab6 df={df} />}
               {activeTab === 6 && <Tab7 df={df} />}
@@ -544,6 +560,51 @@ function computeSiteTrends(df: Batch[]): SiteTrend[] {
   });
 
   return rows.sort((a, b) => b.score - a.score).map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+interface OperatorScore {
+  operator: string;
+  batches: number;
+  qualityRate: number;
+  csiRate: number;
+  durationRate: number;
+  daysIdle: number;
+  score: number;
+  trend: "Improving" | "Stable" | "Declining";
+  arrow: "↑" | "→" | "↓";
+  rag: "Green" | "Amber" | "Red";
+}
+
+function computeOperatorScores(df: Batch[]): OperatorScore[] {
+  const byOp = new Map<string, Batch[]>();
+  df.forEach(b => byOp.set(b.operator_name, [...(byOp.get(b.operator_name) ?? []), b]));
+  const rows: OperatorScore[] = [];
+  byOp.forEach((batches, op) => {
+    const sorted = [...batches].sort((a, b) => a.production_date.localeCompare(b.production_date));
+    const n = sorted.length;
+    const qualityRate = n ? sorted.filter(b => b.c_quality_acceptable).length / n : 0.5;
+    const csiRate = n ? sorted.filter(b => b.csi_compliant).length / n : 0.5;
+    const durationRate = n ? sorted.filter(b => b.c_duration_in_range).length / n : 0.5;
+    const lastDate = sorted[n - 1]?.production_date ?? "";
+    const daysIdle = lastDate ? daysBetween(lastDate) : 30;
+    const activity = Math.max(0, 1 - daysIdle / 30);
+    const score = Math.round(qualityRate * 30 + csiRate * 30 + durationRate * 20 + activity * 20);
+    let trend: "Improving" | "Stable" | "Declining" = "Stable";
+    let arrow: "↑" | "→" | "↓" = "→";
+    if (n >= 4) {
+      const half = Math.floor(n / 2);
+      const earlyQ = sorted.slice(0, half).filter(b => b.c_quality_acceptable).length / half;
+      const earlyC = sorted.slice(0, half).filter(b => b.csi_compliant).length / half;
+      const recentQ = sorted.slice(half).filter(b => b.c_quality_acceptable).length / (n - half);
+      const recentC = sorted.slice(half).filter(b => b.csi_compliant).length / (n - half);
+      const delta = ((recentQ + recentC) - (earlyQ + earlyC)) / 2;
+      if (delta >= 0.1) { trend = "Improving"; arrow = "↑"; }
+      else if (delta <= -0.1) { trend = "Declining"; arrow = "↓"; }
+    }
+    const rag: "Green" | "Amber" | "Red" = score >= 70 ? "Green" : score >= 40 ? "Amber" : "Red";
+    rows.push({ operator: op, batches: n, qualityRate, csiRate, durationRate, daysIdle, score, trend, arrow, rag });
+  });
+  return rows.sort((a, b) => b.score - a.score);
 }
 
 function SnapshotCard({ title, count, items, empty, tone }: {
@@ -795,7 +856,7 @@ ${notes ? `<ul>${notes}</ul>` : "<p>No operational notes recorded in this period
 // ═══════════════════════════════════════════════════════════════════════════
 // TAB 1 — Production Overview
 // ═══════════════════════════════════════════════════════════════════════════
-function Tab1({ df, siteTrends }: { df: Batch[]; siteTrends: SiteTrend[] }) {
+function Tab1({ df, siteTrends, operatorScores }: { df: Batch[]; siteTrends: SiteTrend[]; operatorScores: OperatorScore[] }) {
   const kilnIds = [...new Set(df.map(b => b.kiln_id))].sort();
 
   // Daily timeline
@@ -884,17 +945,29 @@ function Tab1({ df, siteTrends }: { df: Batch[]; siteTrends: SiteTrend[] }) {
           </ResponsiveContainer>
           <table className="w-full text-xs mt-2 border-t" style={{ borderColor: C.metricBorder }}>
             <thead><tr style={{ color: C.subtext }}>
-              <th className="text-left py-1">Kiln</th><th className="text-right py-1">Batches</th>
-              <th className="text-right py-1">Total kg</th><th className="text-right py-1">Days idle</th>
+              <th className="text-left py-1">Kiln</th>
+              <th className="text-right py-1">Score /100</th>
+              <th className="text-left py-1 pl-2">Flag</th>
+              <th className="text-left py-1 pl-2">Trend</th>
+              <th className="text-right py-1">Batches</th>
+              <th className="text-right py-1">Total kg</th>
+              <th className="text-right py-1">Days idle</th>
             </tr></thead>
-            <tbody>{kilnSummary.map(r => (
-              <tr key={r.kiln_id} className="border-t" style={{ borderColor: C.metricBorder }}>
-                <td className="py-1 font-medium">{r.kiln_id}</td>
-                <td className="text-right">{r.batches}</td>
-                <td className="text-right">{r.totalKg.toFixed(0)} kg</td>
-                <td className="text-right">{r.days_idle}d</td>
-              </tr>
-            ))}</tbody>
+            <tbody>{kilnSummary.map(r => {
+              const st = siteTrends.find(t => t.site === r.kiln_id);
+              const ragLabel = st ? (st.rag === "Green" ? "🟢 Stable" : st.rag === "Amber" ? "🟡 Monitor" : "🔴 Urgent") : (r.days_idle > 14 ? "🔴 Idle" : r.days_idle > 7 ? "🟡 Slow" : "🟢 Active");
+              return (
+                <tr key={r.kiln_id} className="border-t" style={{ borderColor: C.metricBorder }}>
+                  <td className="py-1 font-medium">{r.kiln_id}</td>
+                  <td className="text-right font-bold" style={{ color: st ? (st.rag === "Green" ? C.green : st.rag === "Amber" ? C.orange : C.red) : C.subtext }}>{st ? st.score : "—"}</td>
+                  <td className="py-1 pl-2 whitespace-nowrap">{ragLabel}</td>
+                  <td className="py-1 pl-2 whitespace-nowrap">{st ? `${st.arrow} ${st.trend}` : "—"}</td>
+                  <td className="text-right">{r.batches}</td>
+                  <td className="text-right">{r.totalKg.toFixed(0)} kg</td>
+                  <td className="text-right">{r.days_idle}d</td>
+                </tr>
+              );
+            })}</tbody>
           </table>
         </Panel>
 
@@ -913,17 +986,29 @@ function Tab1({ df, siteTrends }: { df: Batch[]; siteTrends: SiteTrend[] }) {
           </ResponsiveContainer>
           <table className="w-full text-xs mt-2 border-t" style={{ borderColor: C.metricBorder }}>
             <thead><tr style={{ color: C.subtext }}>
-              <th className="text-left py-1">Operator</th><th className="text-right py-1">Batches</th>
-              <th className="text-right py-1">Total kg</th><th className="text-right py-1">Pass rate</th>
+              <th className="text-left py-1">Operator</th>
+              <th className="text-right py-1">Score /100</th>
+              <th className="text-left py-1 pl-2">Flag</th>
+              <th className="text-left py-1 pl-2">Trend</th>
+              <th className="text-right py-1">Batches</th>
+              <th className="text-right py-1">Total kg</th>
+              <th className="text-right py-1">Pass rate</th>
             </tr></thead>
-            <tbody>{opSummary.map(r => (
-              <tr key={r.full_name} className="border-t" style={{ borderColor: C.metricBorder }}>
-                <td className="py-1 font-medium">{r.full_name}</td>
-                <td className="text-right">{r.batches}</td>
-                <td className="text-right">{r.totalKg.toFixed(0)} kg</td>
-                <td className="text-right">{(r.pass_rate * 100).toFixed(0)}%</td>
-              </tr>
-            ))}</tbody>
+            <tbody>{opSummary.map(r => {
+              const os = operatorScores.find(o => o.operator === r.full_name);
+              const ragLabel = os ? (os.rag === "Green" ? "🟢 Stable" : os.rag === "Amber" ? "🟡 Monitor" : "🔴 Urgent") : "—";
+              return (
+                <tr key={r.full_name} className="border-t" style={{ borderColor: C.metricBorder }}>
+                  <td className="py-1 font-medium">{r.full_name}</td>
+                  <td className="text-right font-bold" style={{ color: os ? (os.rag === "Green" ? C.green : os.rag === "Amber" ? C.orange : C.red) : C.subtext }}>{os ? os.score : "—"}</td>
+                  <td className="py-1 pl-2 whitespace-nowrap">{ragLabel}</td>
+                  <td className="py-1 pl-2 whitespace-nowrap">{os ? `${os.arrow} ${os.trend}` : "—"}</td>
+                  <td className="text-right">{r.batches}</td>
+                  <td className="text-right">{r.totalKg.toFixed(0)} kg</td>
+                  <td className="text-right">{(r.pass_rate * 100).toFixed(0)}%</td>
+                </tr>
+              );
+            })}</tbody>
           </table>
         </Panel>
       </div>
@@ -1311,7 +1396,7 @@ function Tab2({ df }: { df: Batch[] }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // TAB 3 — Operational Issues
 // ═══════════════════════════════════════════════════════════════════════════
-function Tab3({ df }: { df: Batch[] }) {
+function Tab3({ df, drillFilter, onClearDrill }: { df: Batch[]; drillFilter?: string | null; onClearDrill?: () => void }) {
   const skip = new Set(["", "none", "no problem", "no problem.", "no problem observed.", "no problem occurred.", "nan", "n/a"]);
 
   const alerts: { severity: string; type: string; detail: string }[] = [];
@@ -1381,6 +1466,21 @@ function Tab3({ df }: { df: Batch[] }) {
 
   return (
     <div className="space-y-4">
+      {drillFilter && (
+        <div className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+          style={{ background: "#eff6ff", borderColor: "#bfdbfe", color: "#1d4ed8" }}>
+          <span>
+            {drillFilter === "safety_incidents"
+              ? `🔍 Drill-through: showing ${df.filter(b => b.safety_incidents.toLowerCase() !== "none").length} batch(es) with safety incidents`
+              : "🔍 Drill-through: idle kilns highlighted below"}
+          </span>
+          <button type="button" onClick={onClearDrill}
+            className="ml-auto rounded px-2 py-0.5 text-xs font-medium"
+            style={{ background: "#dbeafe", color: "#1d4ed8" }}>
+            ✕ Clear
+          </button>
+        </div>
+      )}
       <SectionTitle>Active Alerts</SectionTitle>
       {alerts.length === 0 ? (
         <div className="text-sm p-3 rounded" style={{ background: C.lightGreen, color: "#166534" }}>
@@ -1503,7 +1603,7 @@ function Tab3({ df }: { df: Batch[] }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // TAB 4 — Map
 // ═══════════════════════════════════════════════════════════════════════════
-function Tab4({ df, mapboxToken }: { df: Batch[]; mapboxToken: string }) {
+function Tab4({ df, mapboxToken, siteTrends }: { df: Batch[]; mapboxToken: string; siteTrends: SiteTrend[] }) {
   const kilnIds = [...new Set(df.map(b => b.kiln_id))].sort();
   const [selectedKiln, setSelectedKiln] = useState(kilnIds[0] ?? "K-01");
 
@@ -1560,6 +1660,29 @@ function Tab4({ df, mapboxToken }: { df: Batch[]; mapboxToken: string }) {
 
       {selData && (
         <>
+          {(() => {
+            const st = siteTrends.find(t => t.site === selectedKiln);
+            const compN = df.filter(b => b.kiln_id === selectedKiln && b.compliance_fails > 0).length;
+            const safeN = df.filter(b => b.kiln_id === selectedKiln && b.safety_incidents.toLowerCase() !== "none").length;
+            const flags: string[] = [];
+            if (safeN > 0) flags.push(`🔴 ${safeN} safety incident(s)`);
+            if (compN > 0) flags.push(`🟠 ${compN} batch(es) with compliance failures`);
+            if (st) {
+              const trendIcon = st.trend === "Declining" ? "🟡" : st.trend === "Improving" ? "🟢" : "⚪";
+              flags.push(`${trendIcon} Quality trend: ${st.arrow} ${st.trend} (score ${st.score})`);
+            }
+            return flags.length > 0 ? (
+              <div className="rounded-lg border px-3 py-2 text-sm mb-3"
+                style={{ background: "#fffbeb", borderColor: C.orange, color: "#92400e" }}>
+                {flags.join("  ·  ")}
+              </div>
+            ) : (
+              <div className="rounded-lg border px-3 py-2 text-sm mb-3"
+                style={{ background: C.lightGreen, borderColor: C.green, color: "#166534" }}>
+                🟢 No active risk flags for this kiln.
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <MetricCard label="Total Output" value={`${selData.totalKg.toFixed(0)} kg`} />
             <MetricCard label="Batches" value={selData.batches} />

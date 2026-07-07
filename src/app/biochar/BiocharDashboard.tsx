@@ -10,7 +10,7 @@ import {
   ScatterChart, Scatter, ResponsiveContainer, ComposedChart, Area,
 } from "recharts";
 import {
-  PYRO_MIN, PYRO_MAX, ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE,
+  PYRO_MIN, PYRO_MAX, ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE, SUBMISSION_LAG_SLA_DAYS,
   type Batch, type FeedstockAppearance,
 } from "./data";
 import type { BiocharDataSource } from "./ona";
@@ -467,6 +467,16 @@ function computeDecisionSnapshot(df: Batch[]): DecisionSnapshot {
         action: "Check kiln operation and feed cycle notes today.",
       });
     }
+
+    if (batch.submission_lag_days > SUBMISSION_LAG_SLA_DAYS) {
+      warnings.push({
+        severity: "Warning",
+        type: "Late submission",
+        site: batch.kiln_id,
+        detail: `Batch ${batch.batch_id} on ${fmtDate(batch.production_date)}: ${batch.submission_lag_days}d lag (SLA: ${SUBMISSION_LAG_SLA_DAYS}d)`,
+        action: "Follow up with operator to ensure timely form submission.",
+      });
+    }
   });
 
   const byKiln = new Map<string, Batch[]>();
@@ -501,6 +511,9 @@ function computeDecisionSnapshot(df: Batch[]): DecisionSnapshot {
   }
   if (warnings.some(item => item.type === "Duration out of range")) {
     actions.push({ timing: "Next batch", site: "Affected operators", action: "Review pyrolysis timing and feed cycle practice." });
+  }
+  if (warnings.some(item => item.type === "Late submission")) {
+    actions.push({ timing: "This week", site: "Affected operators", action: "Follow up to ensure batches are submitted within 3 days of production." });
   }
 
   return {
@@ -1953,6 +1966,7 @@ function Tab7({ df }: { df: Batch[] }) {
 
   const avgLag = df.length ? df.reduce((s, b) => s + b.submission_lag_days, 0) / df.length : 0;
   const maxLag = df.length ? Math.max(...df.map(b => b.submission_lag_days)) : 0;
+  const slaBreachedCount = df.filter(b => b.submission_lag_days > SUBMISSION_LAG_SLA_DAYS).length;
   const lagData = [...df].sort((a, b) => a.production_date.localeCompare(b.production_date))
     .map(b => ({ batch: b.batch_id.slice(-3), lag: b.submission_lag_days }));
 
@@ -2042,9 +2056,14 @@ function Tab7({ df }: { df: Batch[] }) {
       </div>
 
       <SectionTitle>Submission Lag</SectionTitle>
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <MetricCard label="Average lag" value={`${avgLag.toFixed(1)} days`} />
         <MetricCard label="Maximum lag" value={`${maxLag} days`} />
+        <MetricCard
+          label={`Breached SLA (>${SUBMISSION_LAG_SLA_DAYS}d)`}
+          value={slaBreachedCount}
+          flag={slaBreachedCount > 0}
+        />
       </div>
       <p className="text-xs mb-2" style={{ color: C.subtext }}>
         Long lags suggest data reconstructed from memory rather than recorded in real time.

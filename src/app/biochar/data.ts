@@ -4,6 +4,7 @@ export const PYRO_MAX = 240;
 export const ACTIVE_WINDOW_DAYS = 14;
 export const COMPLIANCE_WINDOW_DAYS = 30;
 export const MOISTURE_ESTIMATE = 0.15;
+export const SUBMISSION_LAG_SLA_DAYS = 3;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type FeedstockAppearance = "dry" | "mostly_dry" | "partially_wet" | "wet";

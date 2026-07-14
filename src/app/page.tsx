@@ -5,16 +5,12 @@ import { ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE } from ".
 export const dynamic = "force-dynamic";
 
 const C = {
-  title: "#1F3864",
-  heading: "#2E75B6",
-  border: "#e9ecef",
-  subtext: "#6b7280",
-  green: "#27AE60",
-  lightGreen: "#D5F5E3",
-  red: "#E74C3C",
-  lightRed: "#FADBD8",
-  orange: "#F39C12",
-  bg: "#f8f7f3",
+  brand: "#c2410c", brandDark: "#9a3412", brandBg: "#fff7ed",
+  border: "#e7e5e4", text: "#1c1917", muted: "#78716c",
+  success: "#15803d", successBg: "#f0fdf4",
+  danger: "#b91c1c", dangerBg: "#fef2f2",
+  warning: "#b45309", warningBg: "#fffbeb",
+  bg: "#fafaf8",
 };
 
 function daysAgo(days: number): string {
@@ -23,288 +19,238 @@ function daysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function StatPill({
-  label, value, sub, accent,
-}: { label: string; value: string; sub?: string; accent?: "green" | "red" | "amber" }) {
-  const color = accent === "green" ? C.green : accent === "red" ? C.red : accent === "amber" ? C.orange : C.title;
-  const bg = accent === "green" ? C.lightGreen : accent === "red" ? C.lightRed : accent === "amber" ? "#fffbeb" : "#f8f9fa";
+function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: "green" | "red" | "amber" | "brand" }) {
+  const fg = accent === "green" ? C.success : accent === "red" ? C.danger : accent === "amber" ? C.warning : accent === "brand" ? C.brand : C.text;
+  const bg = accent === "green" ? C.successBg : accent === "red" ? C.dangerBg : accent === "amber" ? C.warningBg : accent === "brand" ? C.brandBg : "#fff";
   return (
-    <div className="rounded-lg border p-3 flex flex-col gap-1" style={{ background: bg, borderColor: C.border }}>
-      <div className="text-xs font-semibold" style={{ color: C.subtext }}>{label}</div>
-      <div className="text-2xl font-bold leading-tight" style={{ color }}>{value}</div>
-      {sub && <div className="text-xs" style={{ color: C.subtext }}>{sub}</div>}
+    <div className="rounded-xl border p-4 flex flex-col" style={{ background: bg, borderColor: C.border }}>
+      <p className="text-xs font-medium" style={{ color: C.muted }}>{label}</p>
+      <p className="text-2xl font-bold mt-0.5 leading-tight" style={{ color: fg }}>{value}</p>
+      {sub && <p className="text-xs mt-1" style={{ color: C.muted }}>{sub}</p>}
     </div>
   );
 }
 
-function ModuleCard({
-  icon, title, description, href, badge, badgeColor,
-}: { icon: string; title: string; description: string; href: string; badge: string; badgeColor: string }) {
-  return (
-    <Link href={href} className="block group">
-      <div className="bg-white rounded-lg border p-4 transition-shadow group-hover:shadow-md h-full"
-        style={{ borderColor: C.border }}>
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="h-10 w-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: "#f8f9fa" }}>
-            {icon}
-          </div>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full mt-1"
-            style={{ background: badgeColor === "green" ? C.lightGreen : "#f1f5f9",
-                     color: badgeColor === "green" ? "#166534" : C.subtext }}>
-            {badge}
-          </span>
-        </div>
-        <h2 className="text-sm font-bold" style={{ color: C.title }}>{title}</h2>
-        <p className="text-xs mt-1 leading-relaxed" style={{ color: C.subtext }}>{description}</p>
-        <div className="mt-3 text-xs font-medium group-hover:underline" style={{ color: C.heading }}>
-          Open →
-        </div>
-      </div>
-    </Link>
-  );
-}
+export default async function OverviewPage() {
+  const data = await loadBiocharData();
+  const batches = data.batches;
+  const hasData = batches.length > 0 && !data.error;
 
-export default async function DashboardPage() {
-  const biocharData = await loadBiocharData();
-  const batches = biocharData.batches;
-
-  const monthCutoff = daysAgo(30);
-  const weekCutoff  = daysAgo(7);
-  const activeCutoff = daysAgo(ACTIVE_WINDOW_DAYS);
+  const monthCutoff   = daysAgo(30);
+  const weekCutoff    = daysAgo(7);
+  const activeCutoff  = daysAgo(ACTIVE_WINDOW_DAYS);
 
   const totalBiochar  = batches.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
   const dryBiochar    = batches.reduce((s, b) => s + b.dry_kg, 0);
-  const monthBiochar  = batches.filter(b => b.production_date >= monthCutoff)
-                                .reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
+  const monthBatches  = batches.filter(b => b.production_date >= monthCutoff).length;
   const weekBatches   = batches.filter(b => b.production_date >= weekCutoff).length;
   const activeKilns   = new Set(batches.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size;
   const totalKilns    = new Set(batches.map(b => b.kiln_id)).size;
-  const qualityPass   = batches.length
-    ? (batches.filter(b => b.c_quality_acceptable).length / batches.length) * 100
-    : 0;
-  const compFlags     = batches.filter(b =>
-    b.production_date >= daysAgo(COMPLIANCE_WINDOW_DAYS) && b.compliance_fails > 0
-  ).length;
+  const qualPct       = batches.length ? batches.filter(b => b.c_quality_acceptable).length / batches.length * 100 : 0;
+  const csiOk         = batches.filter(b => b.csi_compliant).length;
+  const compFlags     = batches.filter(b => b.production_date >= daysAgo(COMPLIANCE_WINDOW_DAYS) && b.compliance_fails > 0).length;
   const safetyInc     = batches.filter(b => b.safety_incidents.toLowerCase() !== "none").length;
-  const csiCompliant  = batches.filter(b => b.csi_compliant).length;
-  const latestBatch   = batches[0];
-  const hasData       = batches.length > 0 && !biocharData.error;
-
-  const modules = [
-    {
-      icon: "🛰️",
-      title: "Project Map",
-      description: "Satellite-based Prosopis invasion extent mapping. GEE layers, quarterly classification, and removal planning.",
-      href: "/prosopis",
-      badge: "Pending GEE layer",
-      badgeColor: "stone",
-    },
-    {
-      icon: "🌿",
-      title: "Harvesting Events",
-      description: "GPS-recorded Prosopis removal events, area cleared, biomass estimates, and feedstock tracking IDs.",
-      href: "/harvesting",
-      badge: "Pending ODK sync",
-      badgeColor: "stone",
-    },
-    {
-      icon: "🔥",
-      title: "Biochar Production",
-      description: "Live ONA submissions — batch tracking, CSI Artisan Pro compliance, quality, maps, and carbon accounting.",
-      href: "/biochar",
-      badge: hasData ? `${batches.length} batches · Live ONA` : biocharData.error ? "ONA unavailable" : "No data",
-      badgeColor: hasData ? "green" : "stone",
-    },
-    {
-      icon: "📊",
-      title: "Project Reports",
-      description: "Monitoring, verification, and compliance reports for CARE / SoilWatch. VM0044 and CSI standards.",
-      href: "/reports",
-      badge: "Draft templates",
-      badgeColor: "stone",
-    },
-  ];
+  const latest        = batches[0];
 
   return (
     <div className="min-h-full" style={{ background: C.bg }}>
       {/* Header */}
       <header className="border-b bg-white px-6 py-5" style={{ borderColor: C.border }}>
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.subtext }}>
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.muted }}>
           CARE Ethiopia · SoilWatch · dMRV Platform
         </p>
-        <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.title }}>
-          Afar Prosopis Biochar Project
+        <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.text }}>
+          Afar Prosopis Biochar
         </h1>
-        <p className="text-sm mt-1" style={{ color: C.subtext }}>
-          Digital MRV workspace — mapping, harvesting, biochar production, and carbon accounting
+        <p className="text-sm mt-1" style={{ color: C.muted }}>
+          Digital monitoring, reporting, and verification. CP2 pyrolysis.
         </p>
       </header>
 
-      {/* Biochar KPIs */}
+      {/* Error */}
+      {data.error && (
+        <div className="mx-6 mt-4 rounded-xl border px-4 py-3 text-sm"
+          style={{ background: C.dangerBg, borderColor: C.danger, color: "#991b1b" }}>
+          ONA: {data.error}
+        </div>
+      )}
+
+      {/* KPIs */}
       <div className="px-6 pt-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold" style={{ color: C.title }}>Biochar Production Overview</h2>
-          <Link href="/biochar" className="text-xs font-medium" style={{ color: C.heading }}>
-            Open full dashboard →
-          </Link>
+          <h2 className="text-sm font-semibold" style={{ color: C.text }}>Biochar production</h2>
+          <Link href="/biochar" className="text-xs font-medium hover:underline" style={{ color: C.brand }}>Full dashboard →</Link>
         </div>
-
-        {biocharData.error && (
-          <div className="mb-3 rounded-lg border px-4 py-3 text-sm"
-            style={{ background: C.lightRed, borderColor: C.red, color: "#922B21" }}>
-            <strong>ONA connection issue:</strong> {biocharData.error}
-          </div>
-        )}
-
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <StatPill
-            label="Biochar Produced"
-            value={hasData ? `${totalBiochar.toFixed(0)} kg` : "—"}
-            sub={hasData ? `${monthBiochar.toFixed(0)} kg in last 30 days` : "ONA not connected"}
-            accent={hasData ? "green" : undefined}
-          />
-          <StatPill
-            label="Dry Biochar (est.)"
-            value={hasData ? `${dryBiochar.toFixed(0)} kg` : "—"}
-            sub={`${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture assumption`}
-          />
-          <StatPill label="Estimated CO₂e" value="Pending" sub="CSI factors unconfirmed" />
-          <StatPill label="Prosopis Area Removed" value="Pending" sub="awaiting harvesting sync" />
+          <Stat label="Total produced" value={hasData ? `${totalBiochar.toFixed(0)} kg` : "—"}
+            sub={hasData ? `${(data.batches[0]?.production_date ?? "").slice(5)} latest` : "ONA not connected"}
+            accent={hasData ? "brand" : undefined} />
+          <Stat label="Dry biochar (est.)" value={hasData ? `${dryBiochar.toFixed(0)} kg` : "—"}
+            sub={`${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj.`} />
+          <Stat label="Carbon (CO₂e)" value="Pending" sub="CSI factors unconfirmed" />
+          <Stat label="Prosopis removed" value="Pending" sub="harvesting sync pending" />
         </div>
-
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatPill
-            label="Total Batches"
-            value={hasData ? `${batches.length}` : "—"}
-            sub={hasData ? `${weekBatches} in last 7 days` : undefined}
-          />
-          <StatPill
-            label="Active Kilns"
-            value={hasData ? `${activeKilns} / ${totalKilns}` : "—"}
-            sub={`last ${ACTIVE_WINDOW_DAYS} days`}
-          />
-          <StatPill
-            label="Quality Pass Rate"
-            value={hasData ? `${qualityPass.toFixed(0)}%` : "—"}
+          <Stat label="Batches" value={hasData ? String(batches.length) : "—"}
+            sub={hasData ? `${monthBatches} this month · ${weekBatches} this week` : undefined} />
+          <Stat label="Active kilns" value={hasData ? `${activeKilns} / ${totalKilns}` : "—"}
+            sub={`last ${ACTIVE_WINDOW_DAYS} days`} />
+          <Stat label="Quality pass" value={hasData ? `${qualPct.toFixed(0)}%` : "—"}
             sub="excellent or good"
-            accent={hasData && qualityPass < 50 ? "red" : hasData ? "green" : undefined}
-          />
-          <StatPill
-            label="Compliance Flags"
-            value={hasData ? `${compFlags}` : "—"}
-            sub={`last ${COMPLIANCE_WINDOW_DAYS} days · incidents: ${safetyInc}`}
-            accent={compFlags > 0 || safetyInc > 0 ? "red" : hasData ? "green" : undefined}
-          />
+            accent={hasData ? (qualPct >= 70 ? "green" : qualPct >= 40 ? "amber" : "red") : undefined} />
+          <Stat label="Compliance flags" value={hasData ? String(compFlags) : "—"}
+            sub={`last ${COMPLIANCE_WINDOW_DAYS} days · ${safetyInc} incident(s)`}
+            accent={compFlags > 0 || safetyInc > 0 ? "red" : hasData ? "green" : undefined} />
         </div>
       </div>
 
-      {/* Module cards + snapshot */}
+      {/* Module grid + latest batch */}
       <div className="px-6 py-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {modules.map(m => (
-            <ModuleCard key={m.href} {...m} />
+          {[
+            {
+              href: "/map",
+              title: "Field Map",
+              desc: "Kiln locations, activity status, production output, and feedstock sources on a live satellite map.",
+              badge: hasData ? `${totalKilns} kilns mapped` : "Waiting for data",
+              ok: hasData,
+            },
+            {
+              href: "/biochar",
+              title: "Biochar Production",
+              desc: "Batch tracking, CSI Artisan Pro compliance heatmap, quality trends, operator performance, and records.",
+              badge: hasData ? `${batches.length} batches · Live ONA` : data.error ? "ONA unavailable" : "No data",
+              ok: hasData,
+            },
+            {
+              href: "/prosopis",
+              title: "Invasion Mapping",
+              desc: "Satellite-based Prosopis extent, invasion blocks, and removal planning.",
+              badge: "Pending GEE layer",
+              ok: false,
+            },
+            {
+              href: "/reports",
+              title: "Reports",
+              desc: "Monitoring and verification reports for CARE and SoilWatch. VM0044 and CSI standards.",
+              badge: "Draft templates",
+              ok: false,
+            },
+          ].map(m => (
+            <Link key={m.href} href={m.href}
+              className="group block bg-white rounded-xl border p-4 transition-shadow hover:shadow-md"
+              style={{ borderColor: C.border }}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h2 className="text-sm font-bold" style={{ color: C.text }}>{m.title}</h2>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                  style={{ background: m.ok ? C.successBg : "#f4f4f3", color: m.ok ? "#166534" : C.muted }}>
+                  {m.badge}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: C.muted }}>{m.desc}</p>
+              <div className="mt-3 text-xs font-semibold group-hover:underline" style={{ color: C.brand }}>Open →</div>
+            </Link>
           ))}
         </div>
 
+        {/* Right column */}
         <div className="space-y-4">
           {/* Latest batch */}
-          <section className="bg-white rounded-lg border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.heading }}>Latest Batch</h2>
+          <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Latest batch</h2>
             {!hasData ? (
-              <p className="text-xs" style={{ color: C.subtext }}>
-                {biocharData.error ? "ONA data unavailable. Check credentials." : "No submissions yet."}
+              <p className="text-xs" style={{ color: C.muted }}>
+                {data.error ? "ONA unavailable. Check credentials." : "No submissions yet."}
               </p>
             ) : (
               <div className="space-y-2 text-sm">
-                <div className="rounded-lg border p-3" style={{ borderColor: C.border, background: "#f8f9fa" }}>
-                  <p className="text-xs font-semibold" style={{ color: C.subtext }}>Batch ID</p>
-                  <p className="mt-0.5 font-semibold" style={{ color: C.title }}>{latestBatch.batch_id}</p>
-                  <p className="text-xs" style={{ color: C.subtext }}>
-                    {latestBatch.production_date} · {latestBatch.kiln_id} · {latestBatch.operator_name}
+                <div className="rounded-lg border p-3" style={{ borderColor: C.border, background: "#f9f8f7" }}>
+                  <p className="text-xs" style={{ color: C.muted }}>Batch ID</p>
+                  <p className="font-semibold mt-0.5" style={{ color: C.text }}>{latest.batch_id}</p>
+                  <p className="text-xs mt-0.5" style={{ color: C.muted }}>
+                    {latest.production_date} · {latest.kiln_id} · {latest.operator_name}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border p-2.5" style={{ borderColor: C.border }}>
-                    <p className="text-xs" style={{ color: C.subtext }}>Output</p>
-                    <p className="font-semibold text-sm" style={{ color: C.title }}>{latestBatch.biochar_wet_weight_kg.toFixed(1)} kg</p>
-                    <p className="text-[11px]" style={{ color: C.subtext }}>{latestBatch.biochar_visual_quality} quality</p>
+                    <p className="text-xs" style={{ color: C.muted }}>Output</p>
+                    <p className="font-semibold" style={{ color: C.text }}>{latest.biochar_wet_weight_kg.toFixed(1)} kg</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{latest.biochar_visual_quality}</p>
                   </div>
                   <div className="rounded-lg border p-2.5" style={{ borderColor: C.border }}>
-                    <p className="text-xs" style={{ color: C.subtext }}>CSI status</p>
-                    <p className="font-semibold text-sm" style={{ color: latestBatch.csi_compliant ? C.green : C.red }}>
-                      {latestBatch.csi_compliant ? "✓ Compliant" : `✗ ${latestBatch.compliance_fails} fail(s)`}
+                    <p className="text-xs" style={{ color: C.muted }}>CSI status</p>
+                    <p className="font-semibold" style={{ color: latest.csi_compliant ? C.success : C.danger }}>
+                      {latest.csi_compliant ? "✓ Compliant" : `✗ ${latest.compliance_fails} fail(s)`}
                     </p>
-                    <p className="text-[11px]" style={{ color: C.subtext }}>{latestBatch.pyrolysis_duration_min} min pyrolysis</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{latest.pyrolysis_duration_min} min</p>
                   </div>
                 </div>
               </div>
             )}
-          </section>
+          </div>
 
-          {/* Project compliance summary */}
-          <section className="bg-white rounded-lg border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.heading }}>Compliance Summary</h2>
+          {/* Compliance summary */}
+          <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Compliance</h2>
             {!hasData ? (
-              <p className="text-xs" style={{ color: C.subtext }}>Connect ONA to see compliance data.</p>
+              <p className="text-xs" style={{ color: C.muted }}>Connect ONA to see compliance data.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {[
-                  { label: "CSI compliant batches", value: `${csiCompliant} / ${batches.length}`, pct: csiCompliant / batches.length },
-                  { label: "Quality pass rate", value: `${qualityPass.toFixed(0)}%`, pct: qualityPass / 100 },
-                  { label: "Safety OK", value: `${batches.length - safetyInc} / ${batches.length}`, pct: (batches.length - safetyInc) / batches.length },
+                  { label: "CSI compliant", value: `${csiOk}/${batches.length}`, pct: csiOk / batches.length },
+                  { label: "Quality pass",  value: `${qualPct.toFixed(0)}%`,     pct: qualPct / 100 },
+                  { label: "Safety ok",     value: `${batches.length - safetyInc}/${batches.length}`, pct: (batches.length - safetyInc) / batches.length },
                 ].map(item => (
                   <div key={item.label}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span style={{ color: C.subtext }}>{item.label}</span>
-                      <span className="font-semibold" style={{ color: C.title }}>{item.value}</span>
+                      <span style={{ color: C.muted }}>{item.label}</span>
+                      <span className="font-semibold" style={{ color: C.text }}>{item.value}</span>
                     </div>
-                    <div className="h-1.5 rounded-full" style={{ background: "#e9ecef" }}>
-                      <div className="h-full rounded-full transition-all"
-                        style={{ width: `${(item.pct * 100).toFixed(0)}%`, background: item.pct >= 0.8 ? C.green : item.pct >= 0.5 ? C.orange : C.red }} />
+                    <div className="h-1.5 rounded-full" style={{ background: "#e7e5e4" }}>
+                      <div className="h-full rounded-full"
+                        style={{ width: `${Math.min(100, item.pct * 100).toFixed(0)}%`,
+                          background: item.pct >= 0.8 ? C.success : item.pct >= 0.5 ? C.warning : C.danger }} />
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </section>
+          </div>
 
-          {/* ONA connection */}
-          <section className="bg-white rounded-lg border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-2" style={{ color: C.heading }}>Data Connection</h2>
+          {/* Data connections */}
+          <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Data connections</h2>
             <div className="space-y-1.5 text-xs">
               {[
-                { label: "ONA biochar form", status: hasData ? "Connected" : "Error", ok: hasData },
-                { label: "ONA harvesting form", status: "Not configured", ok: false },
-                { label: "GEE satellite layers", status: "Not connected", ok: false },
-                { label: "Carbon accounting", status: "CSI factors pending", ok: false },
+                { label: "ONA biochar form",    ok: hasData,  status: hasData ? "Connected" : "Error" },
+                { label: "ONA harvesting form", ok: false, status: "Not configured" },
+                { label: "GEE satellite",       ok: false, status: "Not connected" },
+                { label: "Carbon accounting",   ok: false, status: "CSI factors pending" },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between">
-                  <span style={{ color: C.title }}>{item.label}</span>
-                  <span className="font-medium" style={{ color: item.ok ? C.green : C.subtext }}>
+                  <span style={{ color: C.text }}>{item.label}</span>
+                  <span className="font-medium" style={{ color: item.ok ? C.success : C.muted }}>
                     {item.ok ? "●" : "○"} {item.status}
                   </span>
                 </div>
               ))}
             </div>
-          </section>
+          </div>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="px-6 pb-6">
-        <div className="rounded-lg border bg-white px-4 py-3" style={{ borderColor: C.border }}>
-          <div className="flex flex-wrap gap-4 text-xs" style={{ color: C.subtext }}>
+      <footer className="px-6 pb-6">
+        <div className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: C.border }}>
+          <div className="flex flex-wrap gap-3 text-xs" style={{ color: C.muted }}>
             <span>CARE Ethiopia · SoilWatch dMRV</span>
             <span>·</span>
-            <span>Afar Prosopis Biochar Project — CP2 Pyrolysis</span>
+            <span>ONA form {data.formId ?? "not configured"}</span>
             <span>·</span>
-            <span>ONA form {biocharData.formId ?? "not configured"}</span>
-            <span>·</span>
-            <span>Loaded: {new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
+            <span>Loaded {new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

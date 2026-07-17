@@ -41,11 +41,11 @@ export default function Sidebar({ userName }: { userName?: string }) {
               className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors"
               style={active
                 ? { background: "rgba(194,65,12,0.2)", color: "#fb923c" }
-                : { color: "#57534e" }
+                : { color: "#a8a29e" }
               }
             >
               <Icon size={14} style={{ flexShrink: 0 }} />
-              <span className={active ? "font-medium" : "hover:text-stone-300 transition-colors"}>
+              <span className={active ? "font-medium" : "hover:text-white transition-colors"}>
                 {label}
               </span>
             </Link>
@@ -55,9 +55,9 @@ export default function Sidebar({ userName }: { userName?: string }) {
 
       {userName && (
         <div className="px-4 py-4 border-t border-stone-800">
-          <p className="text-xs text-stone-600 truncate mb-2">{userName}</p>
+          <p className="text-xs text-stone-400 truncate mb-2">{userName}</p>
           <button onClick={signOut}
-            className="text-xs text-stone-700 hover:text-stone-400 transition-colors">
+            className="text-xs text-stone-500 hover:text-stone-300 transition-colors">
             Sign out
           </button>
         </div>

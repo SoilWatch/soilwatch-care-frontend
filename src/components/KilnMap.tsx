@@ -5,6 +5,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Batch } from "@/app/biochar/data";
 import { ACTIVE_WINDOW_DAYS } from "@/app/biochar/data";
+import type { ClearanceSite } from "@/app/biochar/clearance";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 function daysBetween(d: string) {
@@ -62,6 +63,7 @@ function aggregateKilns(batches: Batch[]): KilnSummary[] {
 
 interface Props {
   batches: Batch[];
+  clearanceSites?: ClearanceSite[];
   mapboxToken: string;
   selectedKiln?: string | null;
   onKilnSelect?: (id: string | null) => void;
@@ -76,7 +78,7 @@ const STYLES = {
 };
 
 export default function KilnMap({
-  batches, mapboxToken, selectedKiln, onKilnSelect,
+  batches, clearanceSites = [], mapboxToken, selectedKiln, onKilnSelect,
   showFeedstockLines = true, showFeedstockMarkers = true,
   style = "satellite",
 }: Props) {
@@ -107,13 +109,22 @@ export default function KilnMap({
     popup.current = new mapboxgl.Popup({ closeButton: false, maxWidth: "260px" });
 
     map.current.on("load", () => {
-      // Fit to show all kilns if there are multiple with valid coords
-      if (kilns.length > 1) {
-        const lngs = kilns.map(k => k.lng);
-        const lats = kilns.map(k => k.lat);
-        const sw: [number, number] = [Math.min(...lngs), Math.min(...lats)];
-        const ne: [number, number] = [Math.max(...lngs), Math.max(...lats)];
-        // Only fit if bounds span more than a few meters
+      // Gather all coordinates: kiln locations + clearance polygon vertices
+      const allLngs: number[] = kilns.map(k => k.lng);
+      const allLats: number[] = kilns.map(k => k.lat);
+      clearanceSites.forEach(s => {
+        s.polygon.coordinates[0].forEach(([lon, lat]) => {
+          allLngs.push(lon);
+          allLats.push(lat);
+        });
+      });
+
+      const validLngs = allLngs.filter(isFinite);
+      const validLats = allLats.filter(isFinite);
+
+      if (validLngs.length > 1) {
+        const sw: [number, number] = [Math.min(...validLngs), Math.min(...validLats)];
+        const ne: [number, number] = [Math.max(...validLngs), Math.max(...validLats)];
         if (ne[0] - sw[0] > 0.001 || ne[1] - sw[1] > 0.001) {
           map.current?.fitBounds([sw, ne], { padding: 80, maxZoom: 13 });
         }
@@ -139,10 +150,11 @@ export default function KilnMap({
 
     // Remove existing layers/sources
     ["kilns-glow", "kilns-circle", "kilns-label",
-     "feedstock-lines", "feedstock-markers"].forEach(id => {
+     "feedstock-lines", "feedstock-markers",
+     "clearance-fill", "clearance-outline", "clearance-label"].forEach(id => {
       if (m.getLayer(id)) m.removeLayer(id);
     });
-    ["kilns", "feedstock"].forEach(id => {
+    ["kilns", "feedstock", "clearance"].forEach(id => {
       if (m.getSource(id)) m.removeSource(id);
     });
 
@@ -196,6 +208,62 @@ export default function KilnMap({
         paint: { "circle-radius": 5, "circle-color": "#fb923c", "circle-opacity": 0.7, "circle-stroke-width": 1, "circle-stroke-color": "#fff" },
       });
     }
+
+    // Clearance site polygons
+    m.addSource("clearance", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: clearanceSites.map(s => ({
+          type: "Feature" as const,
+          geometry: s.polygon,
+          properties: { site_id: s.site_id, submission_time: s.submission_time },
+        })),
+      },
+    });
+
+    m.addLayer({
+      id: "clearance-fill",
+      type: "fill",
+      source: "clearance",
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.18 },
+    });
+
+    m.addLayer({
+      id: "clearance-outline",
+      type: "line",
+      source: "clearance",
+      paint: { "line-color": "#22c55e", "line-width": 2, "line-opacity": 0.85 },
+    });
+
+    m.addLayer({
+      id: "clearance-label",
+      type: "symbol",
+      source: "clearance",
+      layout: {
+        "text-field": ["get", "site_id"],
+        "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+        "text-size": 11,
+        "text-anchor": "center",
+      },
+      paint: { "text-color": "#fff", "text-halo-color": "#14532d", "text-halo-width": 1.5 },
+    });
+
+    m.on("click", "clearance-fill", e => {
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
+      const date = props.submission_time ? new Date(props.submission_time).toLocaleDateString() : "—";
+      popup.current?.setLngLat(e.lngLat).setHTML(`
+        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
+          <div style="font-weight:600;margin-bottom:4px">Clearance Site</div>
+          <div style="color:#78716c">ID: ${props.site_id}</div>
+          <div style="color:#78716c">Submitted: ${date}</div>
+        </div>
+      `).addTo(m);
+    });
+
+    m.on("mouseenter", "clearance-fill", () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", "clearance-fill", () => { m.getCanvas().style.cursor = ""; });
 
     // Kiln source
     m.addSource("kilns", {
@@ -281,7 +349,7 @@ export default function KilnMap({
   useEffect(() => {
     if (ready) renderLayers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, batches, showFeedstockLines, showFeedstockMarkers]);
+  }, [ready, batches, clearanceSites, showFeedstockLines, showFeedstockMarkers]);
 
   function fitToKilns() {
     if (!map.current || kilns.length === 0) return;

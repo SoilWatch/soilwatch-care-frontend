@@ -1,23 +1,51 @@
 import { parseBiocharCsv, type Batch } from "./data";
+import { getDb, ensureSchema } from "@/lib/db";
 
 const ONA_API_BASE = process.env.ONA_API_BASE ?? "https://api.ona.io/api/v1";
 
 export interface BiocharDataSource {
   batches: Batch[];
-  source: "ona";
+  source: "ona" | "db";
   formId?: string;
   error?: string;
   loadedAt: string;
 }
 
-function loadEmptyData(error: string, formId?: string): BiocharDataSource {
-  return {
-    batches: [],
-    source: "ona",
-    formId,
-    error,
-    loadedAt: new Date().toISOString(),
-  };
+async function readBatchesFromDb(formId: string): Promise<Batch[] | null> {
+  const sql = getDb();
+  if (!sql) return null;
+  try {
+    await ensureSchema(sql);
+    const rows = await sql`
+      SELECT data FROM biochar_batches
+      ORDER BY (data->>'production_date') DESC NULLS LAST
+    `;
+    return rows.map(r => r.data as Batch);
+  } catch {
+    return null;
+  }
+}
+
+async function upsertBatchesToDb(batches: Batch[], formId: string): Promise<void> {
+  const sql = getDb();
+  if (!sql || batches.length === 0) return;
+  try {
+    await ensureSchema(sql);
+    await Promise.all(
+      batches.map(batch =>
+        sql`
+          INSERT INTO biochar_batches (batch_id, form_id, data, synced_at)
+          VALUES (${batch.batch_id}, ${formId}, ${JSON.stringify(batch)}::jsonb, NOW())
+          ON CONFLICT (batch_id) DO UPDATE
+            SET form_id   = EXCLUDED.form_id,
+                data      = EXCLUDED.data,
+                synced_at = NOW()
+        `,
+      ),
+    );
+  } catch {
+    // DB write failure is non-fatal — ONA data still returned
+  }
 }
 
 export async function loadBiocharData(): Promise<BiocharDataSource> {
@@ -25,7 +53,17 @@ export async function loadBiocharData(): Promise<BiocharDataSource> {
   const apiToken = process.env.ONA_API_TOKEN;
 
   if (!formId || !apiToken) {
-    return loadEmptyData("ONA_FORM_ID or ONA_API_TOKEN is not configured.");
+    // No ONA config — try serving from DB
+    const dbBatches = await readBatchesFromDb("");
+    if (dbBatches && dbBatches.length > 0) {
+      return { batches: dbBatches, source: "db", loadedAt: new Date().toISOString() };
+    }
+    return {
+      batches: [],
+      source: "ona",
+      error: "ONA_FORM_ID or ONA_API_TOKEN is not configured.",
+      loadedAt: new Date().toISOString(),
+    };
   }
 
   try {
@@ -35,30 +73,45 @@ export async function loadBiocharData(): Promise<BiocharDataSource> {
     });
 
     if (response.status === 401) {
-      return loadEmptyData("ONA rejected the configured API token.", formId);
+      const db = await readBatchesFromDb(formId);
+      return { batches: db ?? [], source: db ? "db" : "ona", formId, error: "ONA rejected the configured API token.", loadedAt: new Date().toISOString() };
     }
-
     if (response.status === 403) {
-      return loadEmptyData(`The configured token cannot access ONA form ${formId}.`, formId);
+      const db = await readBatchesFromDb(formId);
+      return { batches: db ?? [], source: db ? "db" : "ona", formId, error: `The configured token cannot access ONA form ${formId}.`, loadedAt: new Date().toISOString() };
     }
-
     if (response.status === 404) {
-      return loadEmptyData(`ONA form ${formId} was not found.`, formId);
+      const db = await readBatchesFromDb(formId);
+      return { batches: db ?? [], source: db ? "db" : "ona", formId, error: `ONA form ${formId} was not found.`, loadedAt: new Date().toISOString() };
     }
-
     if (!response.ok) {
-      return loadEmptyData(`ONA returned ${response.status} ${response.statusText}.`, formId);
+      const db = await readBatchesFromDb(formId);
+      return { batches: db ?? [], source: db ? "db" : "ona", formId, error: `ONA returned ${response.status} ${response.statusText}.`, loadedAt: new Date().toISOString() };
     }
 
     const csv = await response.text();
+    const onaBatches = parseBiocharCsv(csv);
+
+    // Persist to DB (non-blocking on failure)
+    await upsertBatchesToDb(onaBatches, formId);
+
+    // Read the full historical set from DB; fall back to just-fetched ONA data if DB unavailable
+    const dbBatches = await readBatchesFromDb(formId);
     return {
-      batches: parseBiocharCsv(csv),
-      source: "ona",
+      batches: dbBatches ?? onaBatches,
+      source: dbBatches ? "db" : "ona",
       formId,
       loadedAt: new Date().toISOString(),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown ONA fetch error.";
-    return loadEmptyData(`Failed to fetch ONA data: ${message}`, formId);
+    const db = await readBatchesFromDb(formId);
+    return {
+      batches: db ?? [],
+      source: db ? "db" : "ona",
+      formId,
+      error: `Failed to fetch ONA data: ${message}`,
+      loadedAt: new Date().toISOString(),
+    };
   }
 }

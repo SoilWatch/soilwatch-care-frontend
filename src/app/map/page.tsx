@@ -1,4 +1,5 @@
 import { loadBiocharData } from "../biochar/ona";
+import { loadClearanceData } from "../biochar/clearance";
 import KilnMapClient from "@/components/KilnMapClient";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +13,9 @@ const C = {
 };
 
 export default async function MapPage() {
-  const dataSource = await loadBiocharData();
+  const [dataSource, clearanceData] = await Promise.all([loadBiocharData(), loadClearanceData()]);
   const batches = dataSource.batches;
+  const clearanceSites = clearanceData.sites;
 
   const kilnSet = new Map<string, { lat: number; lon: number; batches: number; totalKg: number; lastDate: string }>();
   batches.forEach(b => {
@@ -29,6 +31,7 @@ export default async function MapPage() {
     batches: batches.length,
     operators: new Set(batches.map(b => b.operator_name)).size,
     csiOk: batches.filter(b => b.csi_compliant).length,
+    clearanceSites: clearanceSites.length,
   };
 
   return (
@@ -49,6 +52,7 @@ export default async function MapPage() {
             { label: "Batches",   value: stats.batches },
             { label: "Operators", value: stats.operators },
             { label: "CSI OK",    value: stats.csiOk },
+            { label: "Sites",     value: stats.clearanceSites },
           ].map(s => (
             <div key={s.label} className="text-center">
               <div className="text-white font-bold text-lg leading-tight">{s.value}</div>
@@ -59,10 +63,11 @@ export default async function MapPage() {
         {/* Legend */}
         <div className="flex gap-3 flex-wrap">
           {[
-            { label: "Active",     color: C.success },
-            { label: "Idle",       color: C.warning },
-            { label: "Compliance", color: C.brand },
-            { label: "Safety",     color: C.danger },
+            { label: "Active",          color: C.success },
+            { label: "Idle",            color: C.warning },
+            { label: "Compliance",      color: C.brand },
+            { label: "Safety",          color: C.danger },
+            { label: "Clearance site",  color: "#22c55e" },
           ].map(l => (
             <div key={l.label} className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ background: l.color }} />
@@ -86,6 +91,7 @@ export default async function MapPage() {
         <div className="flex-1 min-h-0 relative">
           <KilnMapClient
             batches={batches}
+            clearanceSites={clearanceSites}
             mapboxToken={MAPBOX_TOKEN}
             showFeedstockLines
             showFeedstockMarkers
@@ -93,12 +99,19 @@ export default async function MapPage() {
         </div>
       )}
 
-      {/* Error banner */}
-      {dataSource.error && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 max-w-sm w-full px-4">
-          <div className="rounded-xl border px-4 py-2 text-sm" style={{ background: "#7f1d1d", borderColor: C.danger, color: "#fecaca" }}>
-            ONA issue: {dataSource.error}
-          </div>
+      {/* Error banners */}
+      {(dataSource.error || clearanceData.error) && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 max-w-sm w-full px-4 space-y-2">
+          {dataSource.error && (
+            <div className="rounded-xl border px-4 py-2 text-sm" style={{ background: "#7f1d1d", borderColor: C.danger, color: "#fecaca" }}>
+              ONA issue: {dataSource.error}
+            </div>
+          )}
+          {clearanceData.error && (
+            <div className="rounded-xl border px-4 py-2 text-sm" style={{ background: "#7f1d1d", borderColor: C.danger, color: "#fecaca" }}>
+              Clearance form issue: {clearanceData.error}
+            </div>
+          )}
         </div>
       )}
     </div>

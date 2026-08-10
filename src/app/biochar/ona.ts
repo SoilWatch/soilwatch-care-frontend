@@ -1,6 +1,6 @@
 import type { Batch } from "./data";
 
-const FASTAPI_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
 
 export interface BiocharDataSource {
   batches: Batch[];
@@ -12,22 +12,22 @@ export interface BiocharDataSource {
 
 export async function loadBiocharData(): Promise<BiocharDataSource> {
   try {
-    const res = await fetch(`${FASTAPI_URL}/api/batches`, { cache: "no-store" });
+    const res = await fetch(`${BACKEND_URL}/api/batches`, { cache: "no-store" });
     if (!res.ok) {
       return {
         batches: [],
         source: "ona",
-        error: `API returned ${res.status}`,
+        error: `Backend returned ${res.status} ${res.statusText}.`,
         loadedAt: new Date().toISOString(),
       };
     }
-    return res.json() as Promise<BiocharDataSource>;
+    return res.json();
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return {
       batches: [],
       source: "ona",
-      error: `Failed to reach API: ${message}`,
+      error: `Failed to reach backend: ${message}`,
       loadedAt: new Date().toISOString(),
     };
   }

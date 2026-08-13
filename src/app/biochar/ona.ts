@@ -69,7 +69,6 @@ export async function loadBiocharData(): Promise<BiocharDataSource> {
   try {
     const response = await fetch(`${ONA_API_BASE}/data/${formId}.csv`, {
       headers: { Authorization: `Token ${apiToken}` },
-      cache: "no-store",
     });
 
     if (response.status === 401) {

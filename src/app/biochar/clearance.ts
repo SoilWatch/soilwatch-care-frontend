@@ -151,7 +151,6 @@ export async function loadClearanceData(): Promise<ClearanceDataSource> {
   try {
     const res = await fetch(`${ONA_API_BASE}/data/${CLEARANCE_FORM_ID}.json`, {
       headers: { Authorization: `Token ${apiToken}` },
-      cache: "no-store",
     });
 
     if (!res.ok) {

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { loadBiocharData } from "./biochar/ona";
 import { ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE } from "./biochar/data";
 
-export const dynamic = "force-dynamic";
 
 const C = {
   brand: "#c2410c", brandDark: "#9a3412", brandBg: "#fff7ed",

@@ -2,7 +2,6 @@ import { loadBiocharData } from "../biochar/ona";
 import { loadClearanceData } from "../biochar/clearance";
 import KilnMapClient from "@/components/KilnMapClient";
 
-export const dynamic = "force-dynamic";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 

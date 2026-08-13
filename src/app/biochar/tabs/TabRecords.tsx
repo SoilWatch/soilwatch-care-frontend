@@ -112,7 +112,7 @@ export default function TabRecords({ df, kpis, dateFrom, dateTo }: Props) {
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Biochar Report</title>
 <style>body{font-family:Arial,sans-serif;color:#1c1917;margin:32px}table{border-collapse:collapse;width:100%;margin:12px 0}
 td,th{border:1px solid #e7e5e4;padding:8px;text-align:left}th{background:#9a3412;color:white}.muted{color:#78716c}</style></head>
-<body><h1>Biochar Production Report</h1><p class="muted">Afar Prosopis · CARE Ethiopia · SoilWatch dMRV</p>
+<body><h1>Biochar Production Report</h1><p class="muted">CARE · SoilWatch dMRV</p>
 <p>Period: ${dateFrom} – ${dateTo}</p>
 <h2>Summary</h2><table><tbody>${rows.map(([l, v]) => `<tr><th>${l}</th><td>${v}</td></tr>`).join("")}</tbody></table>
 <h2>Batch Records</h2><table><thead><tr><th>Batch</th><th>Date</th><th>Kiln</th><th>Operator</th><th>Wet kg</th><th>Quality</th><th>CSI fails</th></tr></thead>

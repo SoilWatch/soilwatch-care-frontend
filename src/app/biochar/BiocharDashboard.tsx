@@ -130,7 +130,7 @@ export default function BiocharDashboard({ dataSource }: Props) {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.muted }}>
-              CARE Ethiopia · SoilWatch · Biochar Production
+              CARE · SoilWatch · Biochar Production
             </p>
             <h1 className="text-xl font-bold mt-0.5" style={{ color: C.text }}>
               CSI Artisan Pro Monitoring Dashboard

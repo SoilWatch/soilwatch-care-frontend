@@ -56,7 +56,7 @@ export default async function OverviewPage() {
       {/* Header */}
       <header className="border-b bg-white px-6 py-5" style={{ borderColor: C.border }}>
         <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.muted }}>
-          CARE Ethiopia · SoilWatch · dMRV Platform
+          dMRV Platform
         </p>
         <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.text }}>
           Afar Prosopis Biochar
@@ -242,7 +242,7 @@ export default async function OverviewPage() {
       <footer className="px-6 pb-6">
         <div className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: C.border }}>
           <div className="flex flex-wrap gap-3 text-xs" style={{ color: C.muted }}>
-            <span>CARE Ethiopia · SoilWatch dMRV</span>
+            <span>CARE · SoilWatch dMRV</span>
             <span>·</span>
             <span>ONA form {data.formId ?? "not configured"}</span>
             <span>·</span>

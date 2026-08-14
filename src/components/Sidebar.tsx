@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LayoutDashboard, FlameKindling, MapPin, FileBarChart2, Menu, X } from "lucide-react";
@@ -73,7 +72,8 @@ export default function Sidebar({ userName }: { userName?: string }) {
         {/* Header */}
         <div className="px-4 py-4 border-b border-stone-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/soilwatch-logo.jpg"
               alt="SoilWatch"
               width={28}

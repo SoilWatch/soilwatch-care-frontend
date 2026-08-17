@@ -89,7 +89,7 @@ export default function TabRecords({ df, kpis, dateFrom, dateTo }: Props) {
 
   function exportCsv() {
     const fields: (keyof Batch)[] = [
-      "batch_id", "production_date", "kiln_id", "operator_name",
+      "data_source", "batch_id", "production_date", "kiln_id", "operator_name",
       "feedstock_appearance", "feedstock_volume_m3", "feedstock_weight_kg",
       "pyrolysis_duration_min", "biochar_wet_weight_kg", "dry_kg",
       "biochar_visual_quality", "sample_collected", "compliance_fails",
@@ -115,8 +115,8 @@ td,th{border:1px solid #e7e5e4;padding:8px;text-align:left}th{background:#9a3412
 <body><h1>Biochar Production Report</h1><p class="muted">Afar Prosopis · CARE Ethiopia · SoilWatch dMRV</p>
 <p>Period: ${dateFrom} – ${dateTo}</p>
 <h2>Summary</h2><table><tbody>${rows.map(([l, v]) => `<tr><th>${l}</th><td>${v}</td></tr>`).join("")}</tbody></table>
-<h2>Batch Records</h2><table><thead><tr><th>Batch</th><th>Date</th><th>Kiln</th><th>Operator</th><th>Wet kg</th><th>Quality</th><th>CSI fails</th></tr></thead>
-<tbody>${df.map(b => `<tr><td>${b.batch_id}</td><td>${b.production_date}</td><td>${b.kiln_id}</td><td>${b.operator_name}</td><td>${b.biochar_wet_weight_kg.toFixed(1)}</td><td>${b.biochar_visual_quality}</td><td>${b.compliance_fails}</td></tr>`).join("")}</tbody></table>
+<h2>Batch Records</h2><table><thead><tr><th>Type</th><th>Batch</th><th>Date</th><th>Kiln</th><th>Operator</th><th>Wet kg</th><th>Quality</th><th>CSI fails</th></tr></thead>
+<tbody>${df.map(b => `<tr><td>${b.data_source === "regain_kiln_operator" ? "Simplified (regain)" : "Full record"}</td><td>${b.batch_id}</td><td>${b.production_date}</td><td>${b.kiln_id}</td><td>${b.operator_name}</td><td>${b.biochar_wet_weight_kg.toFixed(1)}</td><td>${b.biochar_visual_quality}</td><td>${b.compliance_fails}</td></tr>`).join("")}</tbody></table>
 <p class="muted">Dry biochar estimated at ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture. tCO₂e pending CSI factor confirmation.</p>
 </body></html>`;
     download(`biochar-report-${dateFrom}.html`, "text/html", html);
@@ -203,7 +203,16 @@ td,th{border:1px solid #e7e5e4;padding:8px;text-align:left}th{background:#9a3412
       {/* Batch records table */}
       <Panel>
         <div className="flex items-center justify-between mb-3">
-          <SectionLabel>Batch records ({filtered.length})</SectionLabel>
+          <div>
+            <SectionLabel>Batch records ({filtered.length})</SectionLabel>
+            {df.some(b => b.data_source) && (
+              <p className="text-xs -mt-2" style={{ color: C.muted }}>
+                <strong>{df.filter(b => b.data_source !== "regain_kiln_operator").length}</strong> full records (biochar_batch) + {" "}
+                <strong>{df.filter(b => b.data_source === "regain_kiln_operator").length}</strong> simplified kiln logs (regain_kiln_operator) = {" "}
+                <strong>{df.length}</strong> total
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             <button onClick={exportCsv}
               className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-stone-50"
@@ -228,13 +237,16 @@ td,th{border:1px solid #e7e5e4;padding:8px;text-align:left}th{background:#9a3412
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead><tr className="border-b" style={{ borderColor: C.border, color: C.muted }}>
-              {["Batch","Date","Kiln","Operator","Wet kg","Dry kg","Quality","CSI fails","Sample","Lag"].map(h => (
+              {["Type","Batch","Date","Kiln","Operator","Wet kg","Dry kg","Quality","CSI fails","Sample","Lag"].map(h => (
                 <th key={h} className={`py-1.5 pr-3 font-medium ${["Wet kg","Dry kg","CSI fails","Lag"].includes(h) ? "text-right" : "text-left"}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
               {filtered.slice(0, 100).map(b => (
-                <tr key={b.batch_id} className="border-t hover:bg-stone-50 transition-colors" style={{ borderColor: C.border }}>
+                <tr key={`${b.data_source ?? "biochar_batch"}-${b.batch_id}`} className="border-t hover:bg-stone-50 transition-colors" style={{ borderColor: C.border }}>
+                  <td className="py-1.5 pr-3" style={{ color: C.muted }}>
+                    {b.data_source === "regain_kiln_operator" ? "Simplified (regain)" : "Full record"}
+                  </td>
                   <td className="py-1.5 pr-3 font-medium">{b.batch_id}</td>
                   <td className="py-1.5 pr-3">{b.production_date}</td>
                   <td className="py-1.5 pr-3">{b.kiln_id}</td>

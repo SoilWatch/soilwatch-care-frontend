@@ -12,6 +12,10 @@ export type VisualQuality = "excellent" | "good" | "fair" | "poor";
 export type SmokeLevel = "none" | "minimal" | "moderate" | "heavy" | "very_heavy";
 
 export interface Batch {
+  // "biochar_batch" (full CSI record) or "regain_kiln_operator" (simplified
+  // per-burn log, adapted via regainToBatch in regain.ts). Undefined for
+  // batches parsed straight off the ONA CSV, before merging in regain rows.
+  data_source?: "biochar_batch" | "regain_kiln_operator";
   batch_id: string;
   batch_seq: number;
   kiln_id: string;

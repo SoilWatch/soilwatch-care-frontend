@@ -32,6 +32,7 @@ interface KilnSummary {
   status: KilnStatus;
   complianceFails: number;
   safetyBatches: number;
+  regainOnly: boolean;
 }
 
 function aggregateKilns(batches: Batch[]): KilnSummary[] {
@@ -55,13 +56,18 @@ function aggregateKilns(batches: Batch[]): KilnSummary[] {
     const recent = bs.filter(b => daysBetween(b.production_date) <= 30);
     const safetyBatches = recent.filter(b => b.safety_incidents.toLowerCase() !== "none").length;
     const complianceFails = recent.filter(b => b.compliance_fails > 0).length;
+    // regain_kiln_operator doesn't capture output weight, so a kiln with
+    // only regain records always renders at the minimum marker size — not
+    // a data bug, just nothing to size the marker by. Flagged so the
+    // legend/popup can explain it instead of leaving it a mystery.
+    const regainOnly = bs.every(b => b.data_source === "regain_kiln_operator");
 
     let status: KilnStatus = "active";
     if (safetyBatches > 0) status = "safety";
     else if (complianceFails > 0) status = "compliance";
     else if (daysIdle > ACTIVE_WINDOW_DAYS) status = "idle";
 
-    return { id, lat, lng, totalKg, batchCount: bs.length, lastDate: last.production_date, daysIdle, status, complianceFails, safetyBatches };
+    return { id, lat, lng, totalKg, batchCount: bs.length, lastDate: last.production_date, daysIdle, status, complianceFails, safetyBatches, regainOnly };
   }).filter(k => k.lat !== 0 && k.lng !== 0);
 }
 
@@ -153,7 +159,7 @@ export default function KilnMap({
     if (!m) return;
 
     // Remove existing layers/sources
-    ["kilns-glow", "kilns-circle", "kilns-label",
+    ["kilns-cluster", "kilns-cluster-count", "kilns-glow", "kilns-circle", "kilns-label",
      "feedstock-lines", "feedstock-markers",
      "clearance-fill", "clearance-outline", "clearance-label"].forEach(id => {
       if (m.getLayer(id)) m.removeLayer(id);
@@ -177,7 +183,7 @@ export default function KilnMap({
           feedstockFeatures.push({
             type: "Feature",
             geometry: { type: "Point", coordinates: [b.feedstock_lon, b.feedstock_lat] },
-            properties: { kiln: kiln.id },
+            properties: { kiln: kiln.id, source: b.feedstock_source_desc || "", date: b.production_date },
           });
           lineFeatures.push({
             type: "Feature",
@@ -199,7 +205,7 @@ export default function KilnMap({
         type: "line",
         source: "feedstock",
         filter: ["==", "$type", "LineString"],
-        paint: { "line-color": "#a8a29e", "line-width": 1, "line-dasharray": [3, 2], "line-opacity": 0.5 },
+        paint: { "line-color": "#d6d3d1", "line-width": 1.5, "line-dasharray": [3, 2], "line-opacity": 0.7 },
       });
     }
 
@@ -209,7 +215,7 @@ export default function KilnMap({
         type: "circle",
         source: "feedstock",
         filter: ["==", "$type", "Point"],
-        paint: { "circle-radius": 5, "circle-color": "#fb923c", "circle-opacity": 0.7, "circle-stroke-width": 1, "circle-stroke-color": "#fff" },
+        paint: { "circle-radius": 7, "circle-color": "#38bdf8", "circle-opacity": 0.9, "circle-stroke-width": 1.5, "circle-stroke-color": "#fff" },
       });
     }
 
@@ -230,14 +236,14 @@ export default function KilnMap({
       id: "clearance-fill",
       type: "fill",
       source: "clearance",
-      paint: { "fill-color": "#22c55e", "fill-opacity": 0.18 },
+      paint: { "fill-color": "#22c55e", "fill-opacity": 0.32 },
     });
 
     m.addLayer({
       id: "clearance-outline",
       type: "line",
       source: "clearance",
-      paint: { "line-color": "#22c55e", "line-width": 2, "line-opacity": 0.85 },
+      paint: { "line-color": "#4ade80", "line-width": 3, "line-opacity": 1 },
     });
 
     m.addLayer({
@@ -247,10 +253,10 @@ export default function KilnMap({
       layout: {
         "text-field": ["get", "site_id"],
         "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
-        "text-size": 11,
+        "text-size": 12,
         "text-anchor": "center",
       },
-      paint: { "text-color": "#fff", "text-halo-color": "#14532d", "text-halo-width": 1.5 },
+      paint: { "text-color": "#fff", "text-halo-color": "#14532d", "text-halo-width": 2 },
     });
 
     m.on("click", "clearance-fill", e => {
@@ -269,60 +275,127 @@ export default function KilnMap({
     m.on("mouseenter", "clearance-fill", () => { m.getCanvas().style.cursor = "pointer"; });
     m.on("mouseleave", "clearance-fill", () => { m.getCanvas().style.cursor = ""; });
 
-    // Kiln source
+    m.on("click", "feedstock-markers", e => {
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
+      popup.current?.setLngLat(e.lngLat).setHTML(`
+        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
+          <div style="font-weight:600;margin-bottom:4px">Feedstock source</div>
+          <div style="color:#78716c">Feeds ${props.kiln}</div>
+          ${props.source ? `<div style="color:#78716c">${props.source}</div>` : ""}
+          ${props.date ? `<div style="color:#78716c">${props.date}</div>` : ""}
+        </div>
+      `).addTo(m);
+    });
+    m.on("mouseenter", "feedstock-markers", () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", "feedstock-markers", () => { m.getCanvas().style.cursor = ""; });
+
+    // Kiln source — clustered, since some kilns sit meters apart (same
+    // site) while others are tens of km away. Without clustering, close-by
+    // kilns draw exactly on top of each other and only the last-drawn one
+    // is visible — not a missing-data bug, a rendering one.
     m.addSource("kilns", {
       type: "geojson",
+      cluster: true,
+      clusterRadius: 45,
+      clusterMaxZoom: 13,
       data: {
         type: "FeatureCollection",
         features: kilns.map(k => ({
           type: "Feature" as const,
           geometry: { type: "Point" as const, coordinates: [k.lng, k.lat] },
-          properties: { ...k, color: STATUS_COLOR[k.status], radius: 8 + (k.totalKg / maxKg) * 18 },
+          properties: { ...k, color: STATUS_COLOR[k.status], radius: 14 + (k.totalKg / maxKg) * 14 },
         })),
       },
     });
 
-    // Glow ring
+    // Cluster circles (2+ kilns too close together to draw separately at the current zoom)
+    m.addLayer({
+      id: "kilns-cluster",
+      type: "circle",
+      source: "kilns",
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-radius": ["+", 16, ["*", 2, ["min", ["get", "point_count"], 8]]],
+        "circle-color": "#1c1917",
+        "circle-stroke-width": 2.5,
+        "circle-stroke-color": "#fb923c",
+        "circle-opacity": 0.92,
+      },
+    });
+
+    m.addLayer({
+      id: "kilns-cluster-count",
+      type: "symbol",
+      source: "kilns",
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count"],
+        "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+        "text-size": 13,
+      },
+      paint: { "text-color": "#fff" },
+    });
+
+    // Glow ring (unclustered kilns only)
     m.addLayer({
       id: "kilns-glow",
       type: "circle",
       source: "kilns",
+      filter: ["!", ["has", "point_count"]],
       paint: {
-        "circle-radius": ["get", "radius"],
+        "circle-radius": ["+", ["get", "radius"], 8],
         "circle-color": ["get", "color"],
-        "circle-opacity": 0.15,
+        "circle-opacity": 0.3,
         "circle-radius-transition": { duration: 300 },
       },
     });
 
-    // Main circle
+    // Main circle (unclustered kilns only)
     m.addLayer({
       id: "kilns-circle",
       type: "circle",
       source: "kilns",
+      filter: ["!", ["has", "point_count"]],
       paint: {
-        "circle-radius": ["+", ["get", "radius"], -6],
+        "circle-radius": ["get", "radius"],
         "circle-color": ["get", "color"],
-        "circle-stroke-width": selectedKiln ? ["case", ["==", ["get", "id"], selectedKiln], 3, 1.5] : 1.5,
+        "circle-stroke-width": selectedKiln ? ["case", ["==", ["get", "id"], selectedKiln], 4, 2.5] : 2.5,
         "circle-stroke-color": "#fff",
-        "circle-opacity": 0.9,
+        "circle-opacity": 0.95,
       },
     });
 
-    // Labels
+    // Labels (unclustered kilns only)
     m.addLayer({
       id: "kilns-label",
       type: "symbol",
       source: "kilns",
+      filter: ["!", ["has", "point_count"]],
       layout: {
         "text-field": ["get", "id"],
         "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
-        "text-size": 11,
-        "text-offset": [0, 1.8],
+        "text-size": 13,
+        "text-offset": [0, 2],
         "text-anchor": "top",
       },
-      paint: { "text-color": "#fff", "text-halo-color": "#1c1917", "text-halo-width": 1 },
+      paint: { "text-color": "#fff", "text-halo-color": "#1c1917", "text-halo-width": 1.5 },
     });
+
+    // Click a cluster to zoom in until it splits apart
+    m.on("click", "kilns-cluster", e => {
+      const feature = e.features?.[0];
+      const clusterId = feature?.properties?.cluster_id;
+      if (clusterId === undefined) return;
+      const source = m.getSource("kilns") as mapboxgl.GeoJSONSource;
+      const [lng, lat] = (feature!.geometry as GeoJSON.Point).coordinates;
+      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err || zoom == null) return;
+        m.easeTo({ center: [lng, lat], zoom });
+      });
+    });
+    m.on("mouseenter", "kilns-cluster", () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", "kilns-cluster", () => { m.getCanvas().style.cursor = ""; });
 
     // Click interaction
     m.on("click", "kilns-circle", e => {
@@ -338,6 +411,10 @@ export default function KilnMap({
           </div>
           <div style="color:#78716c">${props.batchCount} batch(es) · ${Number(props.totalKg).toFixed(0)} kg</div>
           <div style="color:#78716c">Last: ${props.lastDate} · ${props.daysIdle}d idle</div>
+          ${props.regainOnly ? `
+          <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e7e5e4;color:#b45309;font-size:11px">
+            Simplified logs only — visual quality/moisture/temperature not captured
+          </div>` : ""}
         </div>
       `).addTo(m);
     });
@@ -369,6 +446,8 @@ export default function KilnMap({
     );
   }
 
+  const hasZeroWeightKiln = kilns.some(k => k.totalKg === 0);
+
   return (
     <div className="relative w-full h-full">
       <div ref={container} className="w-full h-full" />
@@ -380,6 +459,65 @@ export default function KilnMap({
           Fit to kilns
         </button>
       )}
+
+      {/* Legend */}
+      <div
+        className="absolute bottom-8 right-3 z-10 rounded-xl shadow-lg px-3.5 py-3 text-xs"
+        style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 168 }}
+      >
+        <p className="font-semibold text-[10px] uppercase tracking-wider mb-2" style={{ color: "#a8a29e" }}>
+          Kiln status
+        </p>
+        <div className="space-y-1.5">
+          {([
+            ["active", "Active — producing, no flags"],
+            ["idle", `Idle — no batches in ${ACTIVE_WINDOW_DAYS}d`],
+            ["compliance", "Compliance flag — CSI requirement(s) failed"],
+            ["safety", "Safety incident reported"],
+          ] as [KilnStatus, string][]).map(([status, label]) => (
+            <div key={status} className="flex items-center gap-2">
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ background: STATUS_COLOR[status] }}
+              />
+              <span style={{ color: "#e7e5e4" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        <p className="font-semibold text-[10px] uppercase tracking-wider mt-3 mb-2 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>
+          Map markers
+        </p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#22c55e", opacity: 0.6 }} />
+            <span style={{ color: "#e7e5e4" }}>Clearance site — click for details</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="w-3 h-3 rounded-full flex-shrink-0 flex items-center justify-center"
+              style={{ background: "#1c1917", border: "1.5px solid #fb923c" }}
+            />
+            <span style={{ color: "#e7e5e4" }}>Cluster — click to zoom in</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#38bdf8" }} />
+            <span style={{ color: "#e7e5e4" }}>Feedstock source</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-0 flex-shrink-0" style={{ borderTop: "1.5px dashed #d6d3d1" }} />
+            <span style={{ color: "#e7e5e4" }}>Feedstock → kiln link</span>
+          </div>
+        </div>
+        <p className="text-[10px] mt-2.5 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>
+          Marker size = biochar output
+        </p>
+        {hasZeroWeightKiln && (
+          <p className="text-[10px] mt-1" style={{ color: "#fb923c" }}>
+            Small dots: no logged output weight yet
+          </p>
+        )}
+      </div>
     </div>
   );
 }

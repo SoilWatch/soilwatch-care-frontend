@@ -54,7 +54,7 @@ export default function TabRecords({ df, kpis, dateFrom, dateTo }: Props) {
 
   // Carbon KPIs
   const totalWet = df.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
-  const totalDry = totalWet * (1 - MOISTURE_ESTIMATE);
+  const totalDry = df.reduce((s, b) => s + b.dry_kg, 0);
 
   // Cumulative chart
   const cumData: { date: string; wet: number; dry: number }[] = [];
@@ -117,7 +117,7 @@ td,th{border:1px solid #e7e5e4;padding:8px;text-align:left}th{background:#9a3412
 <h2>Summary</h2><table><tbody>${rows.map(([l, v]) => `<tr><th>${l}</th><td>${v}</td></tr>`).join("")}</tbody></table>
 <h2>Batch Records</h2><table><thead><tr><th>Type</th><th>Batch</th><th>Date</th><th>Kiln</th><th>Operator</th><th>Wet kg</th><th>Quality</th><th>CSI fails</th></tr></thead>
 <tbody>${df.map(b => `<tr><td>${b.data_source === "regain_kiln_operator" ? "Simplified (regain)" : "Full record"}</td><td>${b.batch_id}</td><td>${b.production_date}</td><td>${b.kiln_id}</td><td>${b.operator_name}</td><td>${b.biochar_wet_weight_kg.toFixed(1)}</td><td>${b.biochar_visual_quality}</td><td>${b.compliance_fails}</td></tr>`).join("")}</tbody></table>
-<p class="muted">Dry biochar estimated at ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture. tCO₂e pending CSI factor confirmation.</p>
+<p class="muted">Dry biochar: full records at ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj., regain logs at bucket count × 8kg. tCO₂e pending CSI factor confirmation.</p>
 </body></html>`;
     download(`biochar-report-${dateFrom}.html`, "text/html", html);
   }
@@ -128,7 +128,7 @@ td,th{border:1px solid #e7e5e4;padding:8px;text-align:left}th{background:#9a3412
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Wet biochar", value: `${totalWet.toFixed(0)} kg`, sub: "Total produced" },
-          { label: "Dry biochar (est.)", value: `${totalDry.toFixed(0)} kg`, sub: `${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj.` },
+          { label: "Dry biochar (est.)", value: `${totalDry.toFixed(0)} kg`, sub: `full records: ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj. · regain: bucket × 8kg` },
           { label: "Estimated CO₂e", value: "Pending", sub: "CSI factors unconfirmed" },
           { label: "Samples collected", value: `${kpis.samplesCol}/${kpis.totalBatches}`, sub: "For lab verification" },
         ].map(item => (

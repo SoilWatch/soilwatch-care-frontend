@@ -1,5 +1,5 @@
 import type { Batch } from "./data";
-import { PYRO_MIN, PYRO_MAX, ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, SUBMISSION_LAG_SLA_DAYS, MOISTURE_ESTIMATE } from "./data";
+import { PYRO_MIN, PYRO_MAX, ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, SUBMISSION_LAG_SLA_DAYS } from "./data";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -51,7 +51,7 @@ export function computeKpis(df: Batch[]): DashboardKpis {
     monthBatches: df.filter(b => b.production_date >= daysAgo(30)).length,
     weekBatches:  df.filter(b => b.production_date >= daysAgo(7)).length,
     totalBiochar,
-    dryBiochar:   totalBiochar * (1 - MOISTURE_ESTIMATE),
+    dryBiochar:   df.reduce((s, b) => s + b.dry_kg, 0),
     monthBiochar: df.filter(b => b.production_date >= daysAgo(30)).reduce((s, b) => s + b.biochar_wet_weight_kg, 0),
     activeKilns:  new Set(df.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size,
     totalKilns:   new Set(df.map(b => b.kiln_id)).size,

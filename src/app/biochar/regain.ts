@@ -1,14 +1,11 @@
-// regain.ts — regain_kiln_operator (simplified per-burn kiln log), a second
-// ONA form merged into the same combined batch view as biochar_batch. Its
-// data model turned out richer than the docs it was originally ported from
-// suggested: the live form DOES capture real feedstock weight, dry biochar
-// output weight, and burn duration (verified against the live ONA CSV, not
-// assumed) — those are used directly below, not hardcoded to zero. It still
-// genuinely lacks visual quality, moisture, temperature, and safety fields,
-// so only those get neutral/failing defaults.
+// regain.ts — adapts regain_kiln_operator (simplified per-burn kiln log)
+// records into the same Batch shape as biochar_batch.
+//
+// biochar_dry_weight_kg_estimated is buckets_out * 8, not a moisture-derived
+// figure — never run it through the wet/dry moisture formula.
 
 import type { Batch, VisualQuality } from "./data";
-import { MOISTURE_ESTIMATE, PYRO_MIN, PYRO_MAX } from "./data";
+import { PYRO_MIN, PYRO_MAX } from "./data";
 
 export interface RegainRecord {
   batch_id: string;
@@ -44,12 +41,6 @@ export interface RegainDataSource {
   loadedAt: string;
 }
 
-// Adapts a regain_kiln_operator record into a full Batch object. Fields the
-// form genuinely doesn't collect (visual quality, moisture, temperature,
-// safety) get neutral/failing defaults rather than being fabricated as
-// compliant. Fields it does collect (feedstock/output weight, duration) are
-// used as-is, so a fully-filled-in regain log can legitimately score as
-// CSI-compliant — it's not capped at "always fails" just for being regain.
 export function regainToBatch(r: RegainRecord): Batch {
   const productionDate = r.production_date || r.today || "1970-01-01";
   const sampleCollected = r.sample_collected;
@@ -59,13 +50,7 @@ export function regainToBatch(r: RegainRecord): Batch {
   );
   const submissionLagDays = Number.isFinite(lag) ? lag : 0;
 
-  // biochar_dry_weight_kg_estimated from ONA is already moisture-adjusted —
-  // back-derive an equivalent "wet" figure so it round-trips through Batch's
-  // own dry_kg = wet * (1 - MOISTURE_ESTIMATE) formula without double-
-  // discounting moisture.
-  const biocharWetWeightKg = r.biochar_dry_weight_kg != null
-    ? r.biochar_dry_weight_kg / (1 - MOISTURE_ESTIMATE)
-    : 0;
+  const biocharDryWeightKg = r.biochar_dry_weight_kg ?? 0;
   const pyrolysisDurationMin = r.pyrolysis_duration_min ?? 0;
 
   const pf = r.photo_feedstock_pile?.startsWith("http") ?? false;
@@ -75,7 +60,7 @@ export function regainToBatch(r: RegainRecord): Batch {
 
   const c_feedstock_weight = (r.feedstock_weight_kg ?? 0) > 0;
   const c_feedstock_moisture = false; // not captured by either form — no moisture meters
-  const c_biochar_weight = biocharWetWeightKg > 0;
+  const c_biochar_weight = false; // regain never weighs output — estimate only, not a real measurement
   const c_visual_quality = false; // regain doesn't capture visual quality
   const c_no_safety_incidents = true; // regain doesn't collect safety data — assume none reported
   const c_duration_in_range = pyrolysisDurationMin >= PYRO_MIN && pyrolysisDurationMin <= PYRO_MAX;
@@ -115,7 +100,7 @@ export function regainToBatch(r: RegainRecord): Batch {
     temp_avg_c: null,
     temp_duration_above_500: null,
     biochar_visual_quality: visual_quality,
-    biochar_wet_weight_kg: biocharWetWeightKg,
+    biochar_wet_weight_kg: 0,
     biochar_volume_l: null,
     sample_collected: sampleCollected,
     sample_id: null,
@@ -136,7 +121,7 @@ export function regainToBatch(r: RegainRecord): Batch {
     photo_active_pyrolysis: null,
     photo_biochar_output: r.photo_biochar_output,
     photo_sample_bag: null,
-    dry_kg: biocharWetWeightKg * (1 - MOISTURE_ESTIMATE),
+    dry_kg: biocharDryWeightKg,
     submission_lag_days: submissionLagDays,
     photo_feedstock_pile_ok: pf,
     photo_active_pyrolysis_ok: pa,

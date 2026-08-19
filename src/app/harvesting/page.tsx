@@ -1,37 +1,50 @@
+import { getT } from "@/lib/i18n/server";
+
 const C = {
   border: "#e7e5e4", text: "#1c1917", muted: "#78716c",
   bg: "#fafaf8", brand: "#c2410c",
   success: "#15803d", danger: "#b91c1c", warning: "#b45309",
 };
 
-const fieldRequirements = [
-  { field: "Event ID",            source: "ODK auto-generated",              ready: true  },
-  { field: "GPS coordinates",     source: "ODK location widget",             ready: true  },
-  { field: "Area cleared (ha)",   source: "GPS polygon or estimate",         ready: true  },
-  { field: "Biomass removed (t)", source: "Allometric estimate",             ready: false },
-  { field: "Feedstock outcome",   source: "Dropdown: biochar/compost/waste", ready: true  },
-  { field: "Harvester ID",        source: "Operator registry",               ready: true  },
-  { field: "Photos",              source: "ODK camera widget",               ready: true  },
-  { field: "Verification flag",   source: "Field supervisor sign-off",       ready: false },
-];
+export default async function HarvestingPage() {
+  const t = await getT();
 
-const integrations = [
-  { label: "ODK Central API",       status: "Not connected",    ok: false },
-  { label: "ONA harvesting form",   status: "Not configured",   ok: false },
-  { label: "Biochar batch linkage", status: "Pending ODK feed", ok: false },
-  { label: "GEE polygon import",    status: "Pending",          ok: false },
-];
+  const fieldRequirements = [
+    { field: t("harvesting.field.eventId"),      source: t("harvesting.field.eventId.source"),      ready: true  },
+    { field: t("harvesting.field.gps"),          source: t("harvesting.field.gps.source"),          ready: true  },
+    { field: t("harvesting.field.area"),         source: t("harvesting.field.area.source"),         ready: true  },
+    { field: t("harvesting.field.biomass"),      source: t("harvesting.field.biomass.source"),      ready: false },
+    { field: t("harvesting.field.outcome"),      source: t("harvesting.field.outcome.source"),      ready: true  },
+    { field: t("harvesting.field.harvesterId"),  source: t("harvesting.field.harvesterId.source"),  ready: true  },
+    { field: t("harvesting.field.photos"),       source: t("harvesting.field.photos.source"),       ready: true  },
+    { field: t("harvesting.field.verification"), source: t("harvesting.field.verification.source"), ready: false },
+  ];
 
-export default function HarvestingPage() {
+  const integrations = [
+    { label: t("harvesting.integration.odk"),     status: t("harvesting.status.notConnected"),  ok: false },
+    { label: t("harvesting.integration.ona"),     status: t("harvesting.status.notConfigured"), ok: false },
+    { label: t("harvesting.integration.linkage"), status: t("harvesting.status.pendingOdk"),     ok: false },
+    { label: t("harvesting.integration.gee"),     status: t("harvesting.status.pending"),        ok: false },
+  ];
+
+  const traceSteps = [
+    t("harvesting.trace.1"),
+    t("harvesting.trace.2"),
+    t("harvesting.trace.3"),
+    t("harvesting.trace.4"),
+    t("harvesting.trace.5"),
+    t("harvesting.trace.6"),
+  ];
+
   return (
     <div className="min-h-full" style={{ background: C.bg }}>
       <header className="border-b bg-white px-6 py-5" style={{ borderColor: C.border }}>
         <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.muted }}>
-          Afar Prosopis Project · Field Operations
+          {t("harvesting.eyebrow")}
         </p>
-        <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.text }}>Harvesting Events</h1>
+        <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.text }}>{t("harvesting.title")}</h1>
         <p className="text-sm mt-1" style={{ color: C.muted }}>
-          GPS-recorded Prosopis removal events. ODK sync pending.
+          {t("harvesting.subtitle")}
         </p>
       </header>
 
@@ -41,13 +54,13 @@ export default function HarvestingPage() {
           {/* Map placeholder */}
           <div className="rounded-xl border flex flex-col items-center justify-center"
             style={{ borderColor: C.border, background: "#f1f0ee", minHeight: 240 }}>
-            <p className="text-sm font-semibold" style={{ color: C.muted }}>Event map not yet connected</p>
-            <p className="text-xs mt-1" style={{ color: C.muted }}>Connect ODK or ONA harvesting form to display event locations.</p>
+            <p className="text-sm font-semibold" style={{ color: C.muted }}>{t("harvesting.mapPlaceholder.title")}</p>
+            <p className="text-xs mt-1" style={{ color: C.muted }}>{t("harvesting.mapPlaceholder.desc")}</p>
           </div>
 
           {/* Field requirements */}
           <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Field data requirements</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>{t("harvesting.fieldRequirements.title")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {fieldRequirements.map(req => (
                 <div key={req.field} className="flex items-start gap-2">
@@ -67,7 +80,7 @@ export default function HarvestingPage() {
         <div className="space-y-4">
           {/* Integration status */}
           <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Integration status</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>{t("harvesting.integrations.title")}</h2>
             <div className="space-y-2">
               {integrations.map(item => (
                 <div key={item.label} className="flex items-center justify-between text-xs">
@@ -82,16 +95,9 @@ export default function HarvestingPage() {
 
           {/* Traceability chain */}
           <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Traceability chain</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>{t("harvesting.traceability.title")}</h2>
             <div className="space-y-1">
-              {[
-                "ODK: removal event + GPS",
-                "Tracking ID generated",
-                "Biomass transported",
-                "ONA: feedstock ID recorded",
-                "Biochar batch linked",
-                "dMRV chain complete",
-              ].map((step, i, arr) => (
+              {traceSteps.map((step, i, arr) => (
                 <div key={step} className="flex items-start gap-2">
                   <div className="flex flex-col items-center flex-shrink-0">
                     <div className="h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold"

@@ -7,6 +7,8 @@ import {
 import type { Batch } from "../data";
 import { PYRO_MIN, PYRO_MAX, COMPLIANCE_WINDOW_DAYS } from "../data";
 import { daysAgo } from "../compute";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import { qualityLabel } from "@/lib/i18n/enumLabels";
 
 const C = {
   brand: "#c2410c", border: "#e7e5e4", text: "#1c1917", muted: "#78716c",
@@ -15,18 +17,18 @@ const C = {
 };
 
 const COMPLIANCE_DEFS: [keyof Batch, string, boolean][] = [
-  ["c_feedstock_weight",   "Feedstock weight recorded",        true],
-  ["c_feedstock_moisture", "Feedstock moisture recorded",      true],
-  ["c_biochar_weight",     "Biochar output weighed",           true],
-  ["c_visual_quality",     "Visual quality assessed",          true],
-  ["c_sample_collected",   "Composite sample collected",       true],
-  ["c_no_safety_incidents","No safety incidents",              true],
-  ["c_duration_in_range",  "Pyrolysis duration in range",      true],
-  ["c_operator_certified", "Operator certified",               true],
-  ["c_photo_feedstock",    "Feedstock photo captured",         true],
-  ["c_photo_biochar",      "Biochar photo captured",           true],
-  ["c_photo_sample_bag",   "Sample bag photo captured",        true],
-  ["c_temp_data",          "Temperature data (premium)",       false],
+  ["c_feedstock_weight",   "tabQuality.req.feedstockWeight",    true],
+  ["c_feedstock_moisture", "tabQuality.req.feedstockMoisture",  true],
+  ["c_biochar_weight",     "tabQuality.req.biocharWeight",      true],
+  ["c_visual_quality",     "tabQuality.req.visualQuality",      true],
+  ["c_sample_collected",   "tabQuality.req.sampleCollected",    true],
+  ["c_no_safety_incidents","tabQuality.req.noSafetyIncidents",  true],
+  ["c_duration_in_range",  "tabQuality.req.durationInRange",    true],
+  ["c_operator_certified", "tabQuality.req.operatorCertified",  true],
+  ["c_photo_feedstock",    "tabQuality.req.photoFeedstock",     true],
+  ["c_photo_biochar",      "tabQuality.req.photoBiochar",       true],
+  ["c_photo_sample_bag",   "tabQuality.req.photoSampleBag",     true],
+  ["c_temp_data",          "tabQuality.req.tempData",           false],
 ];
 
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -42,14 +44,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function TabQuality({ df }: { df: Batch[] }) {
+  const { t } = useLanguage();
   const recent = df.slice(0, 12);
 
-  const compRate = COMPLIANCE_DEFS.map(([col, label, csi]) => ({
-    label: label.length > 36 ? label.slice(0, 36) + "…" : label,
-    fullLabel: label,
-    pct: df.length ? (df.filter(b => b[col] as unknown as boolean).length / df.length) * 100 : 0,
-    csi,
-  })).sort((a, b) => a.pct - b.pct);
+  const compRate = COMPLIANCE_DEFS.map(([col, labelKey, csi]) => {
+    const label = t(labelKey);
+    return {
+      label: label.length > 36 ? label.slice(0, 36) + "…" : label,
+      fullLabel: label,
+      pct: df.length ? (df.filter(b => b[col] as unknown as boolean).length / df.length) * 100 : 0,
+      csi,
+    };
+  }).sort((a, b) => a.pct - b.pct);
 
   const monthMap: Record<string, { total: number; compliant: number }> = {};
   df.forEach(b => {
@@ -78,7 +84,7 @@ export default function TabQuality({ df }: { df: Batch[] }) {
 
   const qMap: Record<string, number> = {};
   df.forEach(b => { qMap[b.biochar_visual_quality] = (qMap[b.biochar_visual_quality] ?? 0) + 1; });
-  const qData = Object.entries(qMap).map(([k, v]) => ({ name: k, value: v }));
+  const qData = Object.entries(qMap).map(([k, v]) => ({ key: k, name: qualityLabel(t, k), value: v }));
   const qColors: Record<string, string> = { excellent: C.success, good: "#65a30d", fair: C.warning, poor: C.danger };
 
   const scatterData = df.map(b => ({ x: b.pyrolysis_duration_min, y: b.quality_score, id: b.batch_id }));
@@ -91,12 +97,12 @@ export default function TabQuality({ df }: { df: Batch[] }) {
   return (
     <div className="space-y-4">
       <Panel>
-        <SectionLabel>CSI Artisan Pro compliance heatmap (last {recent.length} batches)</SectionLabel>
-        <p className="text-xs mb-3" style={{ color: C.muted }}>Each row = one requirement · Each column = one batch</p>
+        <SectionLabel>{t("tabQuality.heatmap", { n: recent.length })}</SectionLabel>
+        <p className="text-xs mb-3" style={{ color: C.muted }}>{t("tabQuality.heatmap.desc")}</p>
         <div className="overflow-x-auto">
           <table className="text-xs w-full">
             <thead><tr>
-              <th className="text-left pr-4 py-1 font-medium" style={{ color: C.muted, minWidth: 240 }}>Requirement</th>
+              <th className="text-left pr-4 py-1 font-medium" style={{ color: C.muted, minWidth: 240 }}>{t("tabQuality.col.requirement")}</th>
               {recent.map(b => (
                 <th key={b.batch_id} className="text-center px-0.5 py-1 font-normal"
                   style={{ color: C.muted, minWidth: 28, fontSize: 10 }}>
@@ -105,10 +111,10 @@ export default function TabQuality({ df }: { df: Batch[] }) {
               ))}
             </tr></thead>
             <tbody>
-              {COMPLIANCE_DEFS.map(([col, label, csi]) => (
+              {COMPLIANCE_DEFS.map(([col, labelKey, csi]) => (
                 <tr key={col} className="border-t" style={{ borderColor: C.border }}>
                   <td className="pr-4 py-1 whitespace-nowrap" style={{ color: csi ? C.text : C.muted }}>
-                    {!csi && <span style={{ color: "#a8a29e" }}>[p] </span>}{label}
+                    {!csi && <span style={{ color: "#a8a29e" }}>[p] </span>}{t(labelKey)}
                   </td>
                   {recent.map(b => {
                     const pass = b[col] as unknown as boolean;
@@ -128,7 +134,7 @@ export default function TabQuality({ df }: { df: Batch[] }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel>
-          <SectionLabel>Compliance rate by requirement</SectionLabel>
+          <SectionLabel>{t("tabQuality.complianceByRequirement")}</SectionLabel>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={compRate} layout="vertical" margin={{ top: 0, right: 52, left: 8, bottom: 0 }}>
               <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }} />
@@ -142,7 +148,7 @@ export default function TabQuality({ df }: { df: Batch[] }) {
         </Panel>
 
         <Panel>
-          <SectionLabel>CSI compliance by month</SectionLabel>
+          <SectionLabel>{t("tabQuality.complianceByMonth")}</SectionLabel>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={monthData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
@@ -150,8 +156,8 @@ export default function TabQuality({ df }: { df: Batch[] }) {
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="compliant" stackId="a" fill={C.success} name="Compliant" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="non_compliant" stackId="a" fill={C.danger} name="Non-compliant" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="compliant" stackId="a" fill={C.success} name={t("tabQuality.legend.compliant")} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="non_compliant" stackId="a" fill={C.danger} name={t("tabQuality.legend.nonCompliant")} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Panel>
@@ -159,7 +165,7 @@ export default function TabQuality({ df }: { df: Batch[] }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel>
-          <SectionLabel>Quality trend (weekly average)</SectionLabel>
+          <SectionLabel>{t("tabQuality.qualityTrend")}</SectionLabel>
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={trendData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
@@ -168,21 +174,21 @@ export default function TabQuality({ df }: { df: Batch[] }) {
               <YAxis yAxisId="d" orientation="right" tick={{ fontSize: 10 }} />
               <Tooltip />
               <Legend />
-              <Area yAxisId="q" type="monotone" dataKey="avgQuality" fill={C.brand} fillOpacity={0.1} stroke={C.brand} name="Avg quality (1–4)" />
-              <Line yAxisId="d" type="monotone" dataKey="avgDuration" stroke={C.warning} dot={false} name="Avg duration (min)" />
+              <Area yAxisId="q" type="monotone" dataKey="avgQuality" fill={C.brand} fillOpacity={0.1} stroke={C.brand} name={t("tabQuality.legend.avgQuality")} />
+              <Line yAxisId="d" type="monotone" dataKey="avgDuration" stroke={C.warning} dot={false} name={t("tabQuality.legend.avgDuration")} />
             </ComposedChart>
           </ResponsiveContainer>
         </Panel>
 
         <Panel>
-          <SectionLabel>Quality distribution</SectionLabel>
+          <SectionLabel>{t("tabQuality.qualityDistribution")}</SectionLabel>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={qData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                 outerRadius={70} innerRadius={30}
                 label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 labelLine={false}>
-                {qData.map((e, i) => <Cell key={i} fill={qColors[e.name] ?? "#a8a29e"} />)}
+                {qData.map((e, i) => <Cell key={i} fill={qColors[e.key] ?? "#a8a29e"} />)}
               </Pie>
               <Tooltip />
             </PieChart>
@@ -191,14 +197,14 @@ export default function TabQuality({ df }: { df: Batch[] }) {
       </div>
 
       <Panel>
-        <SectionLabel>Duration vs quality scatter</SectionLabel>
+        <SectionLabel>{t("tabQuality.scatter")}</SectionLabel>
         <ResponsiveContainer width="100%" height={180}>
           <ScatterChart margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
-            <XAxis type="number" dataKey="x" name="Duration (min)" tick={{ fontSize: 10 }}
-              label={{ value: "Duration (min)", position: "insideBottom", offset: -2, fontSize: 10 }} />
-            <YAxis type="number" dataKey="y" name="Quality score" domain={[0, 5]} tick={{ fontSize: 10 }} />
-            <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v, n) => [v, n === "x" ? "Duration" : "Quality"]} />
+            <XAxis type="number" dataKey="x" name={t("tabQuality.scatter.duration")} tick={{ fontSize: 10 }}
+              label={{ value: t("tabQuality.scatter.duration"), position: "insideBottom", offset: -2, fontSize: 10 }} />
+            <YAxis type="number" dataKey="y" name={t("tabQuality.scatter.quality")} domain={[0, 5]} tick={{ fontSize: 10 }} />
+            <Tooltip cursor={{ strokeDasharray: "3 3" }} formatter={(v, n) => [v, n === "x" ? t("tabQuality.scatter.duration") : t("tabQuality.scatter.quality")]} />
             <Scatter data={scatterData} fill={C.brand} fillOpacity={0.6} />
           </ScatterChart>
         </ResponsiveContainer>
@@ -206,11 +212,15 @@ export default function TabQuality({ df }: { df: Batch[] }) {
 
       {devBatches.length > 0 && (
         <Panel>
-          <SectionLabel>Deviations in last {COMPLIANCE_WINDOW_DAYS} days</SectionLabel>
+          <SectionLabel>{t("tabQuality.deviations", { n: COMPLIANCE_WINDOW_DAYS })}</SectionLabel>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr style={{ color: C.muted }}>
-                {["Batch", "Date", "Kiln", "Operator", "CSI fails", "Duration", "Quality"].map(h => (
+                {[
+                  t("tabQuality.col.batch"), t("tabQuality.col.date"), t("tabQuality.col.kiln"),
+                  t("tabQuality.col.operator"), t("tabQuality.col.csiFails"), t("tabQuality.col.duration"),
+                  t("tabQuality.col.quality"),
+                ].map(h => (
                   <th key={h} className="text-left py-1 pr-3 font-medium">{h}</th>
                 ))}
               </tr></thead>
@@ -226,7 +236,7 @@ export default function TabQuality({ df }: { df: Batch[] }) {
                       {b.pyrolysis_duration_min} min
                     </td>
                     <td className="py-1.5" style={{ color: b.c_quality_acceptable ? C.success : C.danger }}>
-                      {b.biochar_visual_quality}
+                      {qualityLabel(t, b.biochar_visual_quality)}
                     </td>
                   </tr>
                 ))}

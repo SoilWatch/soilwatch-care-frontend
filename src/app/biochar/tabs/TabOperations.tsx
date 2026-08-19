@@ -2,6 +2,9 @@ import { useState } from "react";
 import type { Batch } from "../data";
 import { ACTIVE_WINDOW_DAYS, SUBMISSION_LAG_SLA_DAYS } from "../data";
 import { daysBetween, daysAgo } from "../compute";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+
+type T = (key: string, vars?: Record<string, string | number>) => string;
 
 const C = {
   brand: "#c2410c", border: "#e7e5e4", text: "#1c1917", muted: "#78716c",
@@ -23,26 +26,27 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 interface Alert {
   type: "danger" | "warning";
+  kind: "safety_incident" | "csi_fails" | "duration_out_of_range" | "late_submission" | "idle_kiln";
   site: string;
   message: string;
 }
 
-function buildAlerts(df: Batch[], drillFilter: string | null): Alert[] {
+function buildAlerts(df: Batch[], drillFilter: string | null, t: T): Alert[] {
   const alerts: Alert[] = [];
   const recent = df.filter(b => b.production_date >= daysAgo(30));
 
   recent.forEach(b => {
     if (b.safety_incidents.toLowerCase() !== "none") {
-      alerts.push({ type: "danger", site: b.kiln_id, message: `Batch ${b.batch_id}: ${b.safety_incidents}` });
+      alerts.push({ type: "danger", kind: "safety_incident", site: b.kiln_id, message: t("tabOperations.alert.safetyIncident", { batch: b.batch_id, detail: b.safety_incidents }) });
     }
     if (b.compliance_fails > 0) {
-      alerts.push({ type: "danger", site: b.kiln_id, message: `Batch ${b.batch_id}: ${b.compliance_fails} CSI requirement(s) failed` });
+      alerts.push({ type: "danger", kind: "csi_fails", site: b.kiln_id, message: t("tabOperations.alert.csiFails", { batch: b.batch_id, n: b.compliance_fails }) });
     }
     if (!b.c_duration_in_range) {
-      alerts.push({ type: "warning", site: b.kiln_id, message: `Batch ${b.batch_id}: pyrolysis ${b.pyrolysis_duration_min} min out of range` });
+      alerts.push({ type: "warning", kind: "duration_out_of_range", site: b.kiln_id, message: t("tabOperations.alert.durationOutOfRange", { batch: b.batch_id, min: b.pyrolysis_duration_min }) });
     }
     if (b.submission_lag_days > SUBMISSION_LAG_SLA_DAYS) {
-      alerts.push({ type: "warning", site: b.kiln_id, message: `Batch ${b.batch_id}: submitted ${b.submission_lag_days}d after production (SLA: ${SUBMISSION_LAG_SLA_DAYS}d)` });
+      alerts.push({ type: "warning", kind: "late_submission", site: b.kiln_id, message: t("tabOperations.alert.lateSubmission", { batch: b.batch_id, days: b.submission_lag_days, sla: SUBMISSION_LAG_SLA_DAYS }) });
     }
   });
 
@@ -52,21 +56,22 @@ function buildAlerts(df: Batch[], drillFilter: string | null): Alert[] {
     const sorted = [...batches].sort((a, b) => b.production_date.localeCompare(a.production_date));
     const idle = daysBetween(sorted[0].production_date);
     if (idle > ACTIVE_WINDOW_DAYS) {
-      alerts.push({ type: "warning", site: kilnId, message: `Idle for ${idle} days, last batch ${sorted[0].production_date}` });
+      alerts.push({ type: "warning", kind: "idle_kiln", site: kilnId, message: t("tabOperations.alert.idleKiln", { days: idle, date: sorted[0].production_date }) });
     }
   });
 
-  if (drillFilter === "idle_kilns") return alerts.filter(a => a.message.startsWith("Idle"));
-  if (drillFilter === "safety_incidents") return alerts.filter(a => a.type === "danger" && a.message.toLowerCase().includes("batch"));
+  if (drillFilter === "idle_kilns") return alerts.filter(a => a.kind === "idle_kiln");
+  if (drillFilter === "safety_incidents") return alerts.filter(a => a.kind === "safety_incident");
   return alerts;
 }
 
 export default function TabOperations({
   df, drillFilter, onClearDrill,
 }: { df: Batch[]; drillFilter: string | null; onClearDrill: () => void }) {
+  const { t } = useLanguage();
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
 
-  const alerts = buildAlerts(df, drillFilter);
+  const alerts = buildAlerts(df, drillFilter, t);
 
   const byKiln = new Map<string, Batch[]>();
   df.forEach(b => byKiln.set(b.kiln_id, [...(byKiln.get(b.kiln_id) ?? []), b]));
@@ -96,15 +101,15 @@ export default function TabOperations({
       {drillFilter && (
         <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
           style={{ background: C.warningBg, border: `1px solid ${C.warning}`, color: C.warning }}>
-          Showing: {drillFilter.replace("_", " ")}
-          <button onClick={onClearDrill} className="ml-auto underline">Clear filter</button>
+          {t("tabOperations.showing", { filter: drillFilter.replace("_", " ") })}
+          <button onClick={onClearDrill} className="ml-auto underline">{t("tabOperations.clearFilter")}</button>
         </div>
       )}
 
       <Panel>
-        <SectionLabel>Active alerts in last 30 days ({alerts.length})</SectionLabel>
+        <SectionLabel>{t("tabOperations.activeAlerts", { n: alerts.length })}</SectionLabel>
         {alerts.length === 0 ? (
-          <p className="text-sm" style={{ color: C.muted }}>No alerts in the current period.</p>
+          <p className="text-sm" style={{ color: C.muted }}>{t("tabOperations.noAlerts")}</p>
         ) : (
           <div className="space-y-1.5">
             {alerts.map((a, i) => (
@@ -120,13 +125,13 @@ export default function TabOperations({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel>
-          <SectionLabel>Days since last production by kiln</SectionLabel>
+          <SectionLabel>{t("tabOperations.idleByKiln")}</SectionLabel>
           <table className="w-full text-xs">
             <thead><tr style={{ color: C.muted }}>
-              <th className="text-left py-1">Kiln</th>
-              <th className="text-right py-1">Batches</th>
-              <th className="text-right py-1">Last batch</th>
-              <th className="text-right py-1">Days idle</th>
+              <th className="text-left py-1">{t("tabOperations.col.kiln")}</th>
+              <th className="text-right py-1">{t("tabOperations.col.batches")}</th>
+              <th className="text-right py-1">{t("tabOperations.col.lastBatch")}</th>
+              <th className="text-right py-1">{t("tabOperations.col.daysIdle")}</th>
             </tr></thead>
             <tbody>{kilnIdle.map(r => (
               <tr key={r.kiln} className="border-t" style={{ borderColor: C.border }}>
@@ -143,13 +148,13 @@ export default function TabOperations({
         </Panel>
 
         <Panel>
-          <SectionLabel>Days since last production by operator</SectionLabel>
+          <SectionLabel>{t("tabOperations.idleByOperator")}</SectionLabel>
           <table className="w-full text-xs">
             <thead><tr style={{ color: C.muted }}>
-              <th className="text-left py-1">Operator</th>
-              <th className="text-right py-1">Batches</th>
-              <th className="text-right py-1">Last batch</th>
-              <th className="text-right py-1">Days idle</th>
+              <th className="text-left py-1">{t("tabOperations.col.operator")}</th>
+              <th className="text-right py-1">{t("tabOperations.col.batches")}</th>
+              <th className="text-right py-1">{t("tabOperations.col.lastBatch")}</th>
+              <th className="text-right py-1">{t("tabOperations.col.daysIdle")}</th>
             </tr></thead>
             <tbody>{opIdle.map(r => (
               <tr key={r.op} className="border-t" style={{ borderColor: C.border }}>
@@ -168,7 +173,7 @@ export default function TabOperations({
 
       {notes.length > 0 && (
         <Panel>
-          <SectionLabel>Operational notes ({notes.length})</SectionLabel>
+          <SectionLabel>{t("tabOperations.notes", { n: notes.length })}</SectionLabel>
           <div className="space-y-1">
             {notes.map(b => (
               <div key={b.batch_id}>
@@ -192,14 +197,14 @@ export default function TabOperations({
 
       {photos.length > 0 && (
         <Panel>
-          <SectionLabel>Photo log</SectionLabel>
+          <SectionLabel>{t("tabOperations.photoLog")}</SectionLabel>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {photos.flatMap(b =>
               ([
-                [b.photo_feedstock_pile, "Feedstock"],
-                [b.photo_active_pyrolysis, "Pyrolysis"],
-                [b.photo_biochar_output, "Output"],
-                [b.photo_sample_bag, "Sample"],
+                [b.photo_feedstock_pile, t("tabOperations.photo.feedstock")],
+                [b.photo_active_pyrolysis, t("tabOperations.photo.pyrolysis")],
+                [b.photo_biochar_output, t("tabOperations.photo.output")],
+                [b.photo_sample_bag, t("tabOperations.photo.sample")],
               ] as [string | null, string][]).filter(([url]) => url).map(([url, label]) => (
                 <div key={`${b.batch_id}-${label}`} className="rounded-lg border overflow-hidden" style={{ borderColor: C.border }}>
                   <a href={url!} target="_blank" rel="noopener noreferrer">

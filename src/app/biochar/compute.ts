@@ -24,6 +24,8 @@ export interface DashboardKpis {
   monthBatches: number;
   weekBatches: number;
   totalBiochar: number;
+  regainBiochar: number;
+  combinedBiochar: number;
   dryBiochar: number;
   monthBiochar: number;
   activeKilns: number;
@@ -45,6 +47,9 @@ export interface DashboardKpis {
 export function computeKpis(df: Batch[]): DashboardKpis {
   const activeCutoff = daysAgo(ACTIVE_WINDOW_DAYS);
   const totalBiochar = df.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
+  const regainBiochar = df.filter(b => b.data_source === "regain_kiln_operator")
+    .reduce((s, b) => s + b.dry_kg, 0);
+  const combinedBiochar = totalBiochar + regainBiochar;
   const avgDuration = df.length ? df.reduce((s, b) => s + b.pyrolysis_duration_min, 0) / df.length : 0;
   // dry_kg for regain rows is a bucket-count guess, not derived from wet
   // weight — mixing it into dryBiochar can push the total above totalBiochar.
@@ -56,6 +61,8 @@ export function computeKpis(df: Batch[]): DashboardKpis {
     monthBatches: df.filter(b => b.production_date >= daysAgo(30)).length,
     weekBatches:  df.filter(b => b.production_date >= daysAgo(7)).length,
     totalBiochar,
+    regainBiochar,
+    combinedBiochar,
     dryBiochar,
     monthBiochar: df.filter(b => b.production_date >= daysAgo(30)).reduce((s, b) => s + b.biochar_wet_weight_kg, 0),
     activeKilns:  new Set(df.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size,

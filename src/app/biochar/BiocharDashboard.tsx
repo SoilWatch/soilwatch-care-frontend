@@ -55,8 +55,10 @@ function buildContext(kpis: ReturnType<typeof computeKpis>, df: { batch_id: stri
   return [
     `Total batches: ${kpis.totalBatches}`,
     `This month: ${kpis.monthBatches}, this week: ${kpis.weekBatches}`,
-    `Total biochar (wet): ${kpis.totalBiochar.toFixed(1)} kg`,
-    `Dry biochar (est.): ${kpis.dryBiochar.toFixed(1)} kg`,
+    `Total biochar (wet, measured): ${kpis.totalBiochar.toFixed(1)} kg`,
+    `Regain estimate (bucket count, unweighed): ${kpis.regainBiochar.toFixed(1)} kg`,
+    `Combined produced: ${kpis.combinedBiochar.toFixed(1)} kg`,
+    `Dry biochar (est., full records only): ${kpis.dryBiochar.toFixed(1)} kg`,
     `Active kilns: ${kpis.activeKilns} / ${kpis.totalKilns}`,
     `Active operators: ${kpis.activeOps} / ${kpis.totalOps}`,
     `Quality pass rate: ${kpis.qualPassRate.toFixed(1)}%`,
@@ -217,8 +219,15 @@ export default function BiocharDashboard({ dataSource }: Props) {
         />
         <KpiCard
           label={t("biochar.kpi.biocharProduced")}
-          value={hasData ? `${kpis.totalBiochar.toFixed(0)} kg` : "—"}
-          sub={hasData ? t("biochar.kpi.biocharProduced.sub", { n: kpis.dryBiochar.toFixed(0) }) : undefined}
+          value={hasData ? `${kpis.combinedBiochar.toFixed(0)} kg` : "—"}
+          sub={
+            !hasData ? undefined
+            : kpis.regainBiochar > 0
+              ? t("biochar.kpi.biocharProduced.breakdown", {
+                  measured: kpis.totalBiochar.toFixed(0), est: kpis.regainBiochar.toFixed(0),
+                })
+              : t("biochar.kpi.biocharProduced.sub", { n: kpis.dryBiochar.toFixed(0) })
+          }
         />
         <KpiCard
           label={t("biochar.kpi.activeKilns")}

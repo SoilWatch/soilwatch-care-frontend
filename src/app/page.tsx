@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { loadBiocharData } from "./biochar/ona";
-import { ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE } from "./biochar/data";
+import { ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS } from "./biochar/data";
 import { getT } from "@/lib/i18n/server";
 import { qualityLabel } from "@/lib/i18n/enumLabels";
 
@@ -43,8 +43,9 @@ export default async function OverviewPage() {
   const activeCutoff  = daysAgo(ACTIVE_WINDOW_DAYS);
 
   const totalBiochar  = batches.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
-  const dryBiochar    = batches.filter(b => b.data_source !== "regain_kiln_operator")
-    .reduce((s, b) => s + b.dry_kg, 0);
+  const regainBatches = batches.filter(b => b.data_source === "regain_kiln_operator");
+  const regainKg      = regainBatches.reduce((s, b) => s + b.dry_kg, 0);
+  const combinedKg    = totalBiochar + regainKg;
   const monthBatches  = batches.filter(b => b.production_date >= monthCutoff).length;
   const weekBatches   = batches.filter(b => b.production_date >= weekCutoff).length;
   const activeKilns   = new Set(batches.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size;
@@ -84,12 +85,16 @@ export default async function OverviewPage() {
           <h2 className="text-sm font-semibold" style={{ color: C.text }}>{t("overview.productionHeading")}</h2>
           <Link href="/biochar" className="text-xs font-medium hover:underline" style={{ color: C.brand }}>{t("overview.fullDashboard")}</Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <Stat label={t("overview.stat.totalProduced")} value={hasData ? `${totalBiochar.toFixed(0)} kg` : "—"}
-            sub={hasData ? t("overview.stat.totalProduced.sub", { date: (data.batches[0]?.production_date ?? "").slice(5) }) : t("overview.stat.notConnected")}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <Stat label={t("overview.stat.totalProduced")} value={hasData ? `${combinedKg.toFixed(0)} kg` : "—"}
+            sub={
+              !hasData ? t("overview.stat.notConnected")
+              : regainKg > 0 ? t("overview.stat.totalProduced.breakdown", {
+                  measured: totalBiochar.toFixed(0), est: regainKg.toFixed(0),
+                })
+              : t("overview.stat.totalProduced.sub", { date: (data.batches[0]?.production_date ?? "").slice(5) })
+            }
             accent={hasData ? "brand" : undefined} />
-          <Stat label={t("overview.stat.dryBiochar")} value={hasData ? `${dryBiochar.toFixed(0)} kg` : "—"}
-            sub={t("overview.stat.dryBiochar.sub", { pct: (MOISTURE_ESTIMATE * 100).toFixed(0) })} />
           <Stat label={t("overview.stat.carbon")} value={t("overview.stat.pending")} sub={t("overview.stat.carbon.sub")} />
           <Stat label={t("overview.stat.prosopisRemoved")} value={t("overview.stat.pending")} sub={t("overview.stat.prosopisRemoved.sub")} />
         </div>

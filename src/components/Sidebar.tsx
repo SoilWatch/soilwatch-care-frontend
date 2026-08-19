@@ -4,16 +4,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, FlameKindling, MapPin, FileBarChart2 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 const NAV = [
-  { href: "/",        label: "Overview",   icon: LayoutDashboard },
-  { href: "/biochar", label: "Production", icon: FlameKindling },
-  { href: "/map",     label: "Field Map",  icon: MapPin },
-  { href: "/reports", label: "Reports",    icon: FileBarChart2 },
+  { href: "/",        key: "nav.overview",   icon: LayoutDashboard },
+  { href: "/biochar", key: "nav.production", icon: FlameKindling },
+  { href: "/map",     key: "nav.map",        icon: MapPin },
+  { href: "/reports", key: "nav.reports",    icon: FileBarChart2 },
 ];
 
 export default function Sidebar({ userName }: { userName?: string }) {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -27,14 +30,18 @@ export default function Sidebar({ userName }: { userName?: string }) {
           <Image src="/soilwatch-logo.jpg" alt="SoilWatch" width={28} height={28}
             className="rounded-md object-contain flex-shrink-0" />
           <div>
-            <p className="text-white text-sm font-semibold leading-none">SoilWatch</p>
-            <p className="text-[11px] mt-0.5 font-medium" style={{ color: "#fb923c" }}>CARE dMRV</p>
+            <p className="text-white text-sm font-semibold leading-none">{t("app.name")}</p>
+            <p className="text-[11px] mt-0.5 font-medium" style={{ color: "#fb923c" }}>{t("app.tagline")}</p>
           </div>
         </div>
       </div>
 
+      <div className="px-4 pt-3 pb-1">
+        <LanguageSwitcher />
+      </div>
+
       <nav className="flex-1 px-3 py-3 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, key, icon: Icon }) => {
           const active = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link key={href} href={href}
@@ -46,7 +53,7 @@ export default function Sidebar({ userName }: { userName?: string }) {
             >
               <Icon size={14} style={{ flexShrink: 0 }} />
               <span className={active ? "font-medium" : "hover:text-white transition-colors"}>
-                {label}
+                {t(key)}
               </span>
             </Link>
           );
@@ -58,7 +65,7 @@ export default function Sidebar({ userName }: { userName?: string }) {
           <p className="text-xs text-stone-400 truncate mb-2">{userName}</p>
           <button onClick={signOut}
             className="text-xs text-stone-500 hover:text-stone-300 transition-colors">
-            Sign out
+            {t("sidebar.signOut")}
           </button>
         </div>
       )}

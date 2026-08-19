@@ -6,6 +6,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Batch } from "@/app/biochar/data";
 import { ACTIVE_WINDOW_DAYS } from "@/app/biochar/data";
 import type { ClearanceSite } from "@/app/biochar/clearance";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 function daysBetween(d: string) {
@@ -92,6 +93,7 @@ export default function KilnMap({
   showFeedstockLines = true, showFeedstockMarkers = true,
   style = "satellite",
 }: Props) {
+  const { t } = useLanguage();
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const popup = useRef<mapboxgl.Popup | null>(null);
@@ -409,11 +411,11 @@ export default function KilnMap({
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${props.color}"></span>
             <span style="text-transform:capitalize">${props.status}</span>
           </div>
-          <div style="color:#78716c">${props.batchCount} batch(es) · ${Number(props.totalKg).toFixed(0)} kg</div>
-          <div style="color:#78716c">Last: ${props.lastDate} · ${props.daysIdle}d idle</div>
+          <div style="color:#78716c">${props.batchCount} ${t("kilnMap.popup.batches")} · ${Number(props.totalKg).toFixed(0)} kg</div>
+          <div style="color:#78716c">${t("kilnMap.popup.last", { date: props.lastDate, days: props.daysIdle })}</div>
           ${props.regainOnly ? `
           <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e7e5e4;color:#b45309;font-size:11px">
-            Simplified logs only — visual quality/moisture/temperature not captured
+            ${t("kilnMap.popup.regainOnly")}
           </div>` : ""}
         </div>
       `).addTo(m);
@@ -456,7 +458,7 @@ export default function KilnMap({
           onClick={fitToKilns}
           className="absolute bottom-8 left-3 z-10 text-xs font-medium px-2.5 py-1.5 rounded-lg shadow transition-opacity hover:opacity-90"
           style={{ background: "#1c1917", color: "#fff", opacity: 0.85 }}>
-          Fit to kilns
+          {t("kilnMap.fitToKilns")}
         </button>
       )}
 
@@ -466,14 +468,14 @@ export default function KilnMap({
         style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 168 }}
       >
         <p className="font-semibold text-[10px] uppercase tracking-wider mb-2" style={{ color: "#a8a29e" }}>
-          Kiln status
+          {t("kilnMap.legend.kilnStatus")}
         </p>
         <div className="space-y-1.5">
           {([
-            ["active", "Active — producing, no flags"],
-            ["idle", `Idle — no batches in ${ACTIVE_WINDOW_DAYS}d`],
-            ["compliance", "Compliance flag — CSI requirement(s) failed"],
-            ["safety", "Safety incident reported"],
+            ["active", t("kilnMap.legend.active")],
+            ["idle", t("kilnMap.legend.idle", { n: ACTIVE_WINDOW_DAYS })],
+            ["compliance", t("kilnMap.legend.compliance")],
+            ["safety", t("kilnMap.legend.safety")],
           ] as [KilnStatus, string][]).map(([status, label]) => (
             <div key={status} className="flex items-center gap-2">
               <span
@@ -486,35 +488,35 @@ export default function KilnMap({
         </div>
 
         <p className="font-semibold text-[10px] uppercase tracking-wider mt-3 mb-2 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>
-          Map markers
+          {t("kilnMap.legend.mapMarkers")}
         </p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#22c55e", opacity: 0.6 }} />
-            <span style={{ color: "#e7e5e4" }}>Clearance site — click for details</span>
+            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.clearanceSite")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span
               className="w-3 h-3 rounded-full flex-shrink-0 flex items-center justify-center"
               style={{ background: "#1c1917", border: "1.5px solid #fb923c" }}
             />
-            <span style={{ color: "#e7e5e4" }}>Cluster — click to zoom in</span>
+            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.cluster")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#38bdf8" }} />
-            <span style={{ color: "#e7e5e4" }}>Feedstock source</span>
+            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.feedstockSource")}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-4 h-0 flex-shrink-0" style={{ borderTop: "1.5px dashed #d6d3d1" }} />
-            <span style={{ color: "#e7e5e4" }}>Feedstock → kiln link</span>
+            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.feedstockLink")}</span>
           </div>
         </div>
         <p className="text-[10px] mt-2.5 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>
-          Marker size = biochar output
+          {t("kilnMap.legend.markerSize")}
         </p>
         {hasZeroWeightKiln && (
           <p className="text-[10px] mt-1" style={{ color: "#fb923c" }}>
-            Small dots: no logged output weight yet
+            {t("kilnMap.legend.zeroWeight")}
           </p>
         )}
       </div>

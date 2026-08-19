@@ -3,6 +3,8 @@
 import { useState, FormEvent, useId } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 // ── Shared input ────────────────────────────────────────────────────────────
 function Field({
@@ -11,6 +13,7 @@ function Field({
   label: string; type?: string; value: string; onChange: (v: string) => void;
   placeholder?: string; hint?: string; autoComplete?: string;
 }) {
+  const { t } = useLanguage();
   const id = useId();
   const [show, setShow] = useState(false);
   const inputType = type === "password" ? (show ? "text" : "password") : type;
@@ -41,7 +44,7 @@ function Field({
             tabIndex={-1}
             onClick={() => setShow(s => !s)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-            aria-label={show ? "Hide password" : "Show password"}
+            aria-label={show ? t("login.hidePassword") : t("login.showPassword")}
           >
             {show ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
@@ -65,6 +68,7 @@ function ErrorBanner({ msg }: { msg: string }) {
 
 // ── Sign-in form ────────────────────────────────────────────────────────────
 function SignInForm() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -81,10 +85,10 @@ function SignInForm() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Login failed."); return; }
+      if (!res.ok) { setError(data.error ?? t("login.error.loginFailed")); return; }
       window.location.href = "/";
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("login.error.network"));
     } finally {
       setLoading(false);
     }
@@ -93,10 +97,10 @@ function SignInForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <ErrorBanner msg={error} />}
-      <Field label="Email address" type="email" value={email} onChange={setEmail}
-        placeholder="you@soilwatch.eu" autoComplete="email" />
-      <Field label="Password" type="password" value={password} onChange={setPassword}
-        placeholder="Your password" autoComplete="current-password" />
+      <Field label={t("login.field.email")} type="email" value={email} onChange={setEmail}
+        placeholder={t("login.placeholder.email")} autoComplete="email" />
+      <Field label={t("login.field.password")} type="password" value={password} onChange={setPassword}
+        placeholder={t("login.placeholder.password")} autoComplete="current-password" />
       <button
         type="submit"
         disabled={loading}
@@ -104,8 +108,8 @@ function SignInForm() {
         style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}
       >
         {loading
-          ? <><Loader2 size={15} className="animate-spin" />Signing in…</>
-          : <><span>Sign in</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
+          ? <><Loader2 size={15} className="animate-spin" />{t("login.signingIn")}</>
+          : <><span>{t("login.signIn")}</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
         }
       </button>
     </form>
@@ -114,6 +118,7 @@ function SignInForm() {
 
 // ── Register form ───────────────────────────────────────────────────────────
 function RegisterForm({ onRegistered }: { onRegistered: () => void }) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -132,10 +137,10 @@ function RegisterForm({ onRegistered }: { onRegistered: () => void }) {
         body: JSON.stringify({ name, email, password, confirm }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Registration failed."); return; }
+      if (!res.ok) { setError(data.error ?? t("login.error.registrationFailed")); return; }
       onRegistered();
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("login.error.network"));
     } finally {
       setLoading(false);
     }
@@ -144,18 +149,18 @@ function RegisterForm({ onRegistered }: { onRegistered: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-xs text-slate-400 leading-relaxed">
-        Open registration for{" "}
+        {t("login.registerNotice.prefix")}{" "}
         <span className="font-medium text-slate-500">@soilwatch.eu · @care.org · @care.et</span>.
-        {" "}Other organisations: contact your administrator.
+        {" "}{t("login.registerNotice.suffix")}
       </p>
       {error && <ErrorBanner msg={error} />}
-      <Field label="Full name" value={name} onChange={setName}
-        placeholder="Your full name" autoComplete="name" />
-      <Field label="Email address" type="email" value={email} onChange={setEmail}
-        placeholder="you@soilwatch.eu" autoComplete="email" />
-      <Field label="Password" type="password" value={password} onChange={setPassword}
-        hint="Minimum 8 characters" autoComplete="new-password" />
-      <Field label="Confirm password" type="password" value={confirm} onChange={setConfirm}
+      <Field label={t("login.field.fullName")} value={name} onChange={setName}
+        placeholder={t("login.placeholder.fullName")} autoComplete="name" />
+      <Field label={t("login.field.email")} type="email" value={email} onChange={setEmail}
+        placeholder={t("login.placeholder.email")} autoComplete="email" />
+      <Field label={t("login.field.password")} type="password" value={password} onChange={setPassword}
+        hint={t("login.field.passwordHint")} autoComplete="new-password" />
+      <Field label={t("login.field.confirmPassword")} type="password" value={confirm} onChange={setConfirm}
         autoComplete="new-password" />
       <button
         type="submit"
@@ -164,8 +169,8 @@ function RegisterForm({ onRegistered }: { onRegistered: () => void }) {
         style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}
       >
         {loading
-          ? <><Loader2 size={15} className="animate-spin" />Creating account…</>
-          : <><span>Create account</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
+          ? <><Loader2 size={15} className="animate-spin" />{t("login.creatingAccount")}</>
+          : <><span>{t("login.createAccount")}</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
         }
       </button>
     </form>
@@ -174,6 +179,7 @@ function RegisterForm({ onRegistered }: { onRegistered: () => void }) {
 
 // ── Page ────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
+  const { t } = useLanguage();
   const [tab, setTab] = useState<"signin" | "register">("signin");
   const [registered, setRegistered] = useState(false);
 
@@ -186,6 +192,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
       style={{ background: "#f1f5f9" }}>
 
+      {/* Language switcher */}
+      <div className="w-full max-w-sm mb-6 flex justify-center">
+        <div className="w-40">
+          <LanguageSwitcher variant="light" />
+        </div>
+      </div>
+
       {/* Logo + wordmark */}
       <div className="mb-8 flex flex-col items-center gap-3">
         <Image
@@ -196,9 +209,9 @@ export default function LoginPage() {
           className="rounded-xl object-contain shadow-sm"
         />
         <div className="text-center">
-          <p className="font-bold text-base" style={{ color: "#0f172a" }}>SoilWatch · Biochar Dashboard</p>
+          <p className="font-bold text-base" style={{ color: "#0f172a" }}>{t("login.brand")}</p>
           <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>
-            CP2 Pyrolysis Production · CARE Ethiopia
+            {t("login.subtitle")}
           </p>
         </div>
       </div>
@@ -208,19 +221,19 @@ export default function LoginPage() {
 
         {/* Tab toggle */}
         <div className="flex border-b border-slate-100">
-          {(["signin", "register"] as const).map(t => (
+          {(["signin", "register"] as const).map(tabId => (
             <button
-              key={t}
+              key={tabId}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setTab(tabId)}
               className="flex-1 py-3.5 text-sm font-medium transition-colors"
               style={{
-                color: tab === t ? "#0f172a" : "#94a3b8",
-                borderBottom: tab === t ? "2px solid #0f172a" : "2px solid transparent",
+                color: tab === tabId ? "#0f172a" : "#94a3b8",
+                borderBottom: tab === tabId ? "2px solid #0f172a" : "2px solid transparent",
                 background: "transparent",
               }}
             >
-              {t === "signin" ? "Sign in" : "Create account"}
+              {tabId === "signin" ? t("login.tab.signin") : t("login.tab.register")}
             </button>
           ))}
         </div>
@@ -229,7 +242,7 @@ export default function LoginPage() {
           {registered && tab === "signin" && (
             <div className="mb-5 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               <CheckCircle2 size={15} className="flex-shrink-0 text-emerald-500" />
-              Account created. You can now sign in.
+              {t("login.registered")}
             </div>
           )}
           {tab === "signin"
@@ -240,7 +253,7 @@ export default function LoginPage() {
       </div>
 
       <p className="mt-6 text-xs" style={{ color: "#cbd5e1" }}>
-        CARE Ethiopia · SoilWatch dMRV
+        {t("login.footer")}
       </p>
     </div>
   );

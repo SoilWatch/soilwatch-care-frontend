@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { loadBiocharData } from "./biochar/ona";
 import { ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE } from "./biochar/data";
+import { getT } from "@/lib/i18n/server";
+import { qualityLabel } from "@/lib/i18n/enumLabels";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,7 @@ function Stat({ label, value, sub, accent }: { label: string; value: string; sub
 }
 
 export default async function OverviewPage() {
-  const data = await loadBiocharData();
+  const [data, t] = await Promise.all([loadBiocharData(), getT()]);
   const batches = data.batches;
   const hasData = batches.length > 0 && !data.error;
 
@@ -41,7 +43,8 @@ export default async function OverviewPage() {
   const activeCutoff  = daysAgo(ACTIVE_WINDOW_DAYS);
 
   const totalBiochar  = batches.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
-  const dryBiochar    = batches.reduce((s, b) => s + b.dry_kg, 0);
+  const dryBiochar    = batches.filter(b => b.data_source !== "regain_kiln_operator")
+    .reduce((s, b) => s + b.dry_kg, 0);
   const monthBatches  = batches.filter(b => b.production_date >= monthCutoff).length;
   const weekBatches   = batches.filter(b => b.production_date >= weekCutoff).length;
   const activeKilns   = new Set(batches.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size;
@@ -57,13 +60,13 @@ export default async function OverviewPage() {
       {/* Header */}
       <header className="border-b bg-white px-6 py-5" style={{ borderColor: C.border }}>
         <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: C.muted }}>
-          CARE Ethiopia · SoilWatch · dMRV Platform
+          {t("overview.eyebrow")}
         </p>
         <h1 className="text-2xl font-bold mt-0.5" style={{ color: C.text }}>
-          Afar Prosopis Biochar
+          {t("overview.title")}
         </h1>
         <p className="text-sm mt-1" style={{ color: C.muted }}>
-          Digital monitoring, reporting, and verification. CP2 pyrolysis.
+          {t("overview.subtitle")}
         </p>
       </header>
 
@@ -71,35 +74,35 @@ export default async function OverviewPage() {
       {data.error && (
         <div className="mx-6 mt-4 rounded-xl border px-4 py-3 text-sm"
           style={{ background: C.dangerBg, borderColor: C.danger, color: "#991b1b" }}>
-          ONA: {data.error}
+          {t("overview.onaError", { error: data.error })}
         </div>
       )}
 
       {/* KPIs */}
       <div className="px-6 pt-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold" style={{ color: C.text }}>Biochar production</h2>
-          <Link href="/biochar" className="text-xs font-medium hover:underline" style={{ color: C.brand }}>Full dashboard →</Link>
+          <h2 className="text-sm font-semibold" style={{ color: C.text }}>{t("overview.productionHeading")}</h2>
+          <Link href="/biochar" className="text-xs font-medium hover:underline" style={{ color: C.brand }}>{t("overview.fullDashboard")}</Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <Stat label="Total produced" value={hasData ? `${totalBiochar.toFixed(0)} kg` : "—"}
-            sub={hasData ? `${(data.batches[0]?.production_date ?? "").slice(5)} latest` : "ONA not connected"}
+          <Stat label={t("overview.stat.totalProduced")} value={hasData ? `${totalBiochar.toFixed(0)} kg` : "—"}
+            sub={hasData ? t("overview.stat.totalProduced.sub", { date: (data.batches[0]?.production_date ?? "").slice(5) }) : t("overview.stat.notConnected")}
             accent={hasData ? "brand" : undefined} />
-          <Stat label="Dry biochar (est.)" value={hasData ? `${dryBiochar.toFixed(0)} kg` : "—"}
-            sub={`full records: ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj. · regain: bucket count × 8kg`} />
-          <Stat label="Carbon (CO₂e)" value="Pending" sub="CSI factors unconfirmed" />
-          <Stat label="Prosopis removed" value="Pending" sub="harvesting sync pending" />
+          <Stat label={t("overview.stat.dryBiochar")} value={hasData ? `${dryBiochar.toFixed(0)} kg` : "—"}
+            sub={t("overview.stat.dryBiochar.sub", { pct: (MOISTURE_ESTIMATE * 100).toFixed(0) })} />
+          <Stat label={t("overview.stat.carbon")} value={t("overview.stat.pending")} sub={t("overview.stat.carbon.sub")} />
+          <Stat label={t("overview.stat.prosopisRemoved")} value={t("overview.stat.pending")} sub={t("overview.stat.prosopisRemoved.sub")} />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="Batches" value={hasData ? String(batches.length) : "—"}
-            sub={hasData ? `${monthBatches} this month · ${weekBatches} this week` : undefined} />
-          <Stat label="Active kilns" value={hasData ? `${activeKilns} / ${totalKilns}` : "—"}
-            sub={`last ${ACTIVE_WINDOW_DAYS} days`} />
-          <Stat label="Quality pass" value={hasData ? `${qualPct.toFixed(0)}%` : "—"}
-            sub="excellent or good"
+          <Stat label={t("overview.stat.batches")} value={hasData ? String(batches.length) : "—"}
+            sub={hasData ? t("overview.stat.batches.sub", { month: monthBatches, week: weekBatches }) : undefined} />
+          <Stat label={t("overview.stat.activeKilns")} value={hasData ? `${activeKilns} / ${totalKilns}` : "—"}
+            sub={t("overview.stat.lastNDays", { n: ACTIVE_WINDOW_DAYS })} />
+          <Stat label={t("overview.stat.qualityPass")} value={hasData ? `${qualPct.toFixed(0)}%` : "—"}
+            sub={t("overview.stat.qualityPass.sub")}
             accent={hasData ? (qualPct >= 70 ? "green" : qualPct >= 40 ? "amber" : "red") : undefined} />
-          <Stat label="Compliance flags" value={hasData ? String(compFlags) : "—"}
-            sub={`last ${COMPLIANCE_WINDOW_DAYS} days · ${safetyInc} incident(s)`}
+          <Stat label={t("overview.stat.complianceFlags")} value={hasData ? String(compFlags) : "—"}
+            sub={t("overview.stat.complianceFlags.sub", { n: COMPLIANCE_WINDOW_DAYS, incidents: safetyInc })}
             accent={compFlags > 0 || safetyInc > 0 ? "red" : hasData ? "green" : undefined} />
         </div>
       </div>
@@ -110,30 +113,30 @@ export default async function OverviewPage() {
           {[
             {
               href: "/map",
-              title: "Field Map",
-              desc: "Kiln locations, activity status, production output, and feedstock sources on a live satellite map.",
-              badge: hasData ? `${totalKilns} kilns mapped` : "Waiting for data",
+              title: t("overview.module.map.title"),
+              desc: t("overview.module.map.desc"),
+              badge: hasData ? t("overview.module.map.badge", { n: totalKilns }) : t("overview.module.map.badge.waiting"),
               ok: hasData,
             },
             {
               href: "/biochar",
-              title: "Biochar Production",
-              desc: "Batch tracking, CSI Artisan Pro compliance heatmap, quality trends, operator performance, and records.",
-              badge: hasData ? `${batches.length} batches · Live ONA` : data.error ? "ONA unavailable" : "No data",
+              title: t("overview.module.biochar.title"),
+              desc: t("overview.module.biochar.desc"),
+              badge: hasData ? t("overview.module.biochar.badge", { n: batches.length }) : data.error ? t("overview.module.biochar.badge.unavailable") : t("overview.module.biochar.badge.noData"),
               ok: hasData,
             },
             {
               href: "/prosopis",
-              title: "Invasion Mapping",
-              desc: "Satellite-based Prosopis extent, invasion blocks, and removal planning.",
-              badge: "Pending GEE layer",
+              title: t("overview.module.prosopis.title"),
+              desc: t("overview.module.prosopis.desc"),
+              badge: t("overview.module.prosopis.badge"),
               ok: false,
             },
             {
               href: "/reports",
-              title: "Reports",
-              desc: "Monitoring and verification reports for CARE and SoilWatch. VM0044 and CSI standards.",
-              badge: "Draft templates",
+              title: t("overview.module.reports.title"),
+              desc: t("overview.module.reports.desc"),
+              badge: t("overview.module.reports.badge"),
               ok: false,
             },
           ].map(m => (
@@ -148,7 +151,7 @@ export default async function OverviewPage() {
                 </span>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: C.muted }}>{m.desc}</p>
-              <div className="mt-3 text-xs font-semibold group-hover:underline" style={{ color: C.brand }}>Open →</div>
+              <div className="mt-3 text-xs font-semibold group-hover:underline" style={{ color: C.brand }}>{t("overview.module.open")}</div>
             </Link>
           ))}
         </div>
@@ -157,15 +160,15 @@ export default async function OverviewPage() {
         <div className="space-y-4">
           {/* Latest batch */}
           <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Latest batch</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>{t("overview.latestBatch.title")}</h2>
             {!hasData ? (
               <p className="text-xs" style={{ color: C.muted }}>
-                {data.error ? "ONA unavailable. Check credentials." : "No submissions yet."}
+                {data.error ? t("overview.latestBatch.unavailable") : t("overview.latestBatch.none")}
               </p>
             ) : (
               <div className="space-y-2 text-sm">
                 <div className="rounded-lg border p-3" style={{ borderColor: C.border, background: "#f9f8f7" }}>
-                  <p className="text-xs" style={{ color: C.muted }}>Batch ID</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{t("overview.latestBatch.batchId")}</p>
                   <p className="font-semibold mt-0.5" style={{ color: C.text }}>{latest.batch_id}</p>
                   <p className="text-xs mt-0.5" style={{ color: C.muted }}>
                     {latest.production_date} · {latest.kiln_id} · {latest.operator_name}
@@ -173,14 +176,14 @@ export default async function OverviewPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border p-2.5" style={{ borderColor: C.border }}>
-                    <p className="text-xs" style={{ color: C.muted }}>Output</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{t("overview.latestBatch.output")}</p>
                     <p className="font-semibold" style={{ color: C.text }}>{latest.biochar_wet_weight_kg.toFixed(1)} kg</p>
-                    <p className="text-xs" style={{ color: C.muted }}>{latest.biochar_visual_quality}</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{qualityLabel(t, latest.biochar_visual_quality)}</p>
                   </div>
                   <div className="rounded-lg border p-2.5" style={{ borderColor: C.border }}>
-                    <p className="text-xs" style={{ color: C.muted }}>CSI status</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{t("overview.latestBatch.csiStatus")}</p>
                     <p className="font-semibold" style={{ color: latest.csi_compliant ? C.success : C.danger }}>
-                      {latest.csi_compliant ? "✓ Compliant" : `✗ ${latest.compliance_fails} fail(s)`}
+                      {latest.csi_compliant ? t("overview.latestBatch.compliant") : t("overview.latestBatch.fails", { n: latest.compliance_fails })}
                     </p>
                     <p className="text-xs" style={{ color: C.muted }}>{latest.pyrolysis_duration_min} min</p>
                   </div>
@@ -191,15 +194,15 @@ export default async function OverviewPage() {
 
           {/* Compliance summary */}
           <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Compliance</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>{t("overview.compliance.title")}</h2>
             {!hasData ? (
-              <p className="text-xs" style={{ color: C.muted }}>Connect ONA to see compliance data.</p>
+              <p className="text-xs" style={{ color: C.muted }}>{t("overview.compliance.connect")}</p>
             ) : (
               <div className="space-y-2.5">
                 {[
-                  { label: "CSI compliant", value: `${csiOk}/${batches.length}`, pct: csiOk / batches.length },
-                  { label: "Quality pass",  value: `${qualPct.toFixed(0)}%`,     pct: qualPct / 100 },
-                  { label: "Safety ok",     value: `${batches.length - safetyInc}/${batches.length}`, pct: (batches.length - safetyInc) / batches.length },
+                  { label: t("overview.compliance.csi"), value: `${csiOk}/${batches.length}`, pct: csiOk / batches.length },
+                  { label: t("overview.compliance.quality"),  value: `${qualPct.toFixed(0)}%`,     pct: qualPct / 100 },
+                  { label: t("overview.compliance.safety"),     value: `${batches.length - safetyInc}/${batches.length}`, pct: (batches.length - safetyInc) / batches.length },
                 ].map(item => (
                   <div key={item.label}>
                     <div className="flex justify-between text-xs mb-1">
@@ -219,13 +222,13 @@ export default async function OverviewPage() {
 
           {/* Data connections */}
           <div className="bg-white rounded-xl border p-4" style={{ borderColor: C.border }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>Data connections</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: C.text }}>{t("overview.connections.title")}</h2>
             <div className="space-y-1.5 text-xs">
               {[
-                { label: "ONA biochar form",    ok: hasData,  status: hasData ? "Connected" : "Error" },
-                { label: "ONA harvesting form", ok: false, status: "Not configured" },
-                { label: "GEE satellite",       ok: false, status: "Not connected" },
-                { label: "Carbon accounting",   ok: false, status: "CSI factors pending" },
+                { label: t("overview.connections.biocharForm"),    ok: hasData,  status: hasData ? t("overview.connections.connected") : t("overview.connections.error") },
+                { label: t("overview.connections.harvestingForm"), ok: false, status: t("overview.connections.notConfigured") },
+                { label: t("overview.connections.gee"),       ok: false, status: t("overview.connections.notConnected") },
+                { label: t("overview.connections.carbon"),   ok: false, status: t("overview.connections.pending") },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between">
                   <span style={{ color: C.text }}>{item.label}</span>
@@ -243,11 +246,11 @@ export default async function OverviewPage() {
       <footer className="px-6 pb-6">
         <div className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: C.border }}>
           <div className="flex flex-wrap gap-3 text-xs" style={{ color: C.muted }}>
-            <span>CARE Ethiopia · SoilWatch dMRV</span>
+            <span>{t("common.footerBrand")}</span>
             <span>·</span>
-            <span>ONA form {data.formId ?? "not configured"}</span>
+            <span>{t("overview.footer.form", { id: data.formId ?? t("overview.footer.notConfigured") })}</span>
             <span>·</span>
-            <span>Loaded {new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
+            <span>{t("overview.footer.loaded", { when: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) })}</span>
           </div>
         </div>
       </footer>

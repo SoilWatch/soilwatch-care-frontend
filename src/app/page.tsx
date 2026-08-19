@@ -86,7 +86,7 @@ export default async function OverviewPage() {
             sub={hasData ? `${(data.batches[0]?.production_date ?? "").slice(5)} latest` : "ONA not connected"}
             accent={hasData ? "brand" : undefined} />
           <Stat label="Dry biochar (est.)" value={hasData ? `${dryBiochar.toFixed(0)} kg` : "—"}
-            sub={`${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj.`} />
+            sub={`full records: ${(MOISTURE_ESTIMATE * 100).toFixed(0)}% moisture adj. · regain: bucket count × 8kg`} />
           <Stat label="Carbon (CO₂e)" value="Pending" sub="CSI factors unconfirmed" />
           <Stat label="Prosopis removed" value="Pending" sub="harvesting sync pending" />
         </div>

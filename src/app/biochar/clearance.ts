@@ -1,17 +1,18 @@
+import type { components } from "@/lib/api-types";
+
 const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
 
-export interface ClearanceSite {
-  site_id: string;
+// `polygon` is narrowed to GeoJSON.Polygon — the backend types it as a
+// generic object since Pydantic doesn't model GeoJSON.
+type BackendClearanceSite = components["schemas"]["ClearanceSite"];
+type BackendClearanceResponse = components["schemas"]["ClearanceDataSourceResponse"];
+
+export interface ClearanceSite extends Omit<BackendClearanceSite, "polygon"> {
   polygon: GeoJSON.Polygon;
-  submission_id: number;
-  submission_time: string;
 }
 
-export interface ClearanceDataSource {
+export interface ClearanceDataSource extends Omit<BackendClearanceResponse, "sites"> {
   sites: ClearanceSite[];
-  formId: string;
-  error?: string;
-  loadedAt: string;
 }
 
 export async function loadClearanceData(): Promise<ClearanceDataSource> {
@@ -25,7 +26,8 @@ export async function loadClearanceData(): Promise<ClearanceDataSource> {
         loadedAt: new Date().toISOString(),
       };
     }
-    return res.json();
+    const data: BackendClearanceResponse = await res.json();
+    return { ...data, sites: data.sites as unknown as ClearanceSite[] };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return {

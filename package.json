@@ -6,10 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:api-types": "openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.ts"
   },
   "dependencies": {
-"@types/bcryptjs": "^2.4.6",
+    "@types/bcryptjs": "^2.4.6",
     "@types/mapbox-gl": "^3.4.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
@@ -28,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

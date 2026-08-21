@@ -5,12 +5,10 @@ export type Dictionary = Record<string, string>;
 // Flat, dot-namespaced keys. {placeholders} are interpolated at call time.
 export const dictionaries: Record<Locale, Dictionary> = {
   en: {
-    // ── App chrome ──────────────────────────────────────────────────────
     "app.name": "SoilWatch",
     "app.tagline": "CARE dMRV",
     "common.footerBrand": "CARE Ethiopia · SoilWatch dMRV",
 
-    // ── Nav / Sidebar ───────────────────────────────────────────────────
     "nav.overview": "Overview",
     "nav.production": "Production",
     "nav.map": "Field Map",
@@ -18,7 +16,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "sidebar.signOut": "Sign out",
     "sidebar.language": "Language",
 
-    // ── Login page ──────────────────────────────────────────────────────
     "login.brand": "SoilWatch · Biochar Dashboard",
     "login.subtitle": "CP2 Pyrolysis Production · CARE Ethiopia",
     "login.tab.signin": "Sign in",
@@ -45,7 +42,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "login.registered": "Account created. You can now sign in.",
     "login.footer": "CARE Ethiopia · SoilWatch dMRV",
 
-    // ── Overview (home) page ────────────────────────────────────────────
     "overview.eyebrow": "CARE Ethiopia · SoilWatch · dMRV Platform",
     "overview.title": "Afar Prosopis Biochar",
     "overview.subtitle": "Digital monitoring, reporting, and verification. CP2 pyrolysis.",
@@ -112,7 +108,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "overview.footer.notConfigured": "not configured",
     "overview.footer.loaded": "Loaded {when}",
 
-    // ── Harvesting page ─────────────────────────────────────────────────
     "harvesting.eyebrow": "Afar Prosopis Project · Field Operations",
     "harvesting.title": "Harvesting Events",
     "harvesting.subtitle": "GPS-recorded Prosopis removal events. ODK sync pending.",
@@ -152,7 +147,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "harvesting.trace.5": "Biochar batch linked",
     "harvesting.trace.6": "dMRV chain complete",
 
-    // ── Prosopis page ───────────────────────────────────────────────────
     "prosopis.eyebrow": "Afar Prosopis Project · Satellite View",
     "prosopis.title": "Invasion Extent & Removal Mapping",
     "prosopis.subtitle": "Satellite-based Prosopis extent classification. GEE layer pending.",
@@ -173,7 +167,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "prosopis.phase.carbon": "Carbon accounting",
     "prosopis.phase.carbon.status": "CSI factors pending",
 
-    // ── Reports page ────────────────────────────────────────────────────
     "reports.title": "Project Reports",
     "reports.description": "Monitoring, verification, and compliance reports for the Afar Prosopis Biochar project",
     "reports.item.coverage": "Quarterly Project Coverage Report",
@@ -187,7 +180,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "reports.badge.ready": "Ready",
     "reports.badge.pending": "Pending",
 
-    // ── Map page ────────────────────────────────────────────────────────
     "map.eyebrow": "Afar Prosopis Biochar · Field Map",
     "map.title": "Kiln Locations & Production Status",
     "map.stat.kilns": "Kilns",
@@ -205,7 +197,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "map.error.ona": "ONA issue: {error}",
     "map.error.clearance": "Clearance form issue: {error}",
 
-    // ── Kiln map (component) ───────────────────────────────────────────
     "kilnMap.fitToKilns": "Fit to kilns",
     "kilnMap.legend.kilnStatus": "Kiln status",
     "kilnMap.legend.mapMarkers": "Map markers",
@@ -223,7 +214,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "kilnMap.popup.last": "Last: {date} · {days}d idle",
     "kilnMap.popup.regainOnly": "Simplified logs only — visual quality/moisture/temperature not captured",
 
-    // ── Biochar dashboard: header / KPIs / tabs / footer ───────────────
     "biochar.eyebrow": "CARE Ethiopia · SoilWatch · Biochar Production",
     "biochar.title": "CSI Artisan Pro Monitoring Dashboard",
     "biochar.period": "Period",
@@ -279,7 +269,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "biochar.ai.noAnswer": "No answer.",
     "biochar.ai.requestFailed": "Request failed. Check your connection.",
 
-    // ── Biochar alert / trend labels (from compute.ts) ──────────────────
     "biochar.alert.safetyIncident": "Safety incident",
     "biochar.alert.csiFailure": "CSI failure",
     "biochar.alert.durationOutOfRange": "Duration out of range",
@@ -289,7 +278,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "biochar.trend.stable": "Stable",
     "biochar.trend.declining": "Declining",
 
-    // ── Tab: Production ──────────────────────────────────────────────────
     "tabProduction.outputOverTime": "Output over time",
     "tabProduction.byKiln": "By kiln",
     "tabProduction.byOperator": "By operator",
@@ -307,7 +295,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabProduction.smokeObservation": "Smoke observation",
     "tabProduction.pyrolysisDuration": "Pyrolysis duration",
 
-    // ── Tab: Quality ─────────────────────────────────────────────────────
     "tabQuality.heatmap": "CSI Artisan Pro compliance heatmap (last {n} batches)",
     "tabQuality.heatmap.desc": "Each row = one requirement · Each column = one batch",
     "tabQuality.col.requirement": "Requirement",
@@ -343,7 +330,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabQuality.req.photoSampleBag": "Sample bag photo captured",
     "tabQuality.req.tempData": "Temperature data (premium)",
 
-    // ── Tab: Operations ──────────────────────────────────────────────────
     "tabOperations.showing": "Showing: {filter}",
     "tabOperations.clearFilter": "Clear filter",
     "tabOperations.activeAlerts": "Active alerts in last 30 days ({n})",
@@ -367,7 +353,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabOperations.alert.lateSubmission": "Batch {batch}: submitted {days}d after production (SLA: {sla}d)",
     "tabOperations.alert.idleKiln": "Idle for {days} days, last batch {date}",
 
-    // ── Tab: Records ─────────────────────────────────────────────────────
     "tabRecords.wetBiochar": "Wet biochar",
     "tabRecords.wetBiochar.sub": "Total produced",
     "tabRecords.dryBiochar": "Dry biochar (est.)",
@@ -421,7 +406,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabRecords.report.batchRecords": "Batch Records",
     "tabRecords.report.dryNote": "Dry biochar estimated at {pct}% moisture, full records only. tCO₂e pending CSI factor confirmation.",
 
-    // ── Enum display labels ─────────────────────────────────────────────
     "enum.quality.excellent": "Excellent",
     "enum.quality.good": "Good",
     "enum.quality.fair": "Fair",
@@ -438,12 +422,10 @@ export const dictionaries: Record<Locale, Dictionary> = {
   },
 
   am: {
-    // ── App chrome ──────────────────────────────────────────────────────
     "app.name": "SoilWatch",
     "app.tagline": "CARE dMRV",
     "common.footerBrand": "CARE ኢትዮጵያ · SoilWatch dMRV",
 
-    // ── Nav / Sidebar ───────────────────────────────────────────────────
     "nav.overview": "አጠቃላይ እይታ",
     "nav.production": "ምርት",
     "nav.map": "የመስክ ካርታ",
@@ -451,7 +433,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "sidebar.signOut": "ውጣ",
     "sidebar.language": "ቋንቋ",
 
-    // ── Login page ──────────────────────────────────────────────────────
     "login.brand": "SoilWatch · የቢዮቻር ዳሽቦርድ",
     "login.subtitle": "CP2 ፓይሮላይሲስ ምርት · CARE ኢትዮጵያ",
     "login.tab.signin": "ግባ",
@@ -478,7 +459,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "login.registered": "መለያ ተፈጥሯል። አሁን መግባት ይችላሉ።",
     "login.footer": "CARE ኢትዮጵያ · SoilWatch dMRV",
 
-    // ── Overview (home) page ────────────────────────────────────────────
     "overview.eyebrow": "CARE ኢትዮጵያ · SoilWatch · dMRV መድረክ",
     "overview.title": "የአፋር ፕሮሶፒስ ቢዮቻር",
     "overview.subtitle": "ዲጂታል ክትትል፣ ሪፖርት እና ማረጋገጫ። CP2 ፓይሮላይሲስ።",
@@ -545,7 +525,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "overview.footer.notConfigured": "አልተዋቀረም",
     "overview.footer.loaded": "የተጫነው {when}",
 
-    // ── Harvesting page ─────────────────────────────────────────────────
     "harvesting.eyebrow": "የአፋር ፕሮሶፒስ ፕሮጀክት · የመስክ ስራዎች",
     "harvesting.title": "የመሰብሰብ ክንውኖች",
     "harvesting.subtitle": "በ GPS የተመዘገቡ የፕሮሶፒስ ማስወገጃ ክንውኖች። የ ODK ውህደት በመጠባበቅ ላይ።",
@@ -585,7 +564,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "harvesting.trace.5": "የቢዮቻር ባች ተያያዘ",
     "harvesting.trace.6": "የ dMRV ሰንሰለት ተጠናቀቀ",
 
-    // ── Prosopis page ───────────────────────────────────────────────────
     "prosopis.eyebrow": "የአፋር ፕሮሶፒስ ፕሮጀክት · የሳተላይት እይታ",
     "prosopis.title": "የመስፋፋት ስፋት እና የማስወገጃ ካርታ",
     "prosopis.subtitle": "በሳተላይት ላይ የተመሰረተ የፕሮሶፒስ ስፋት ምድብ። የ GEE ንብርብር በመጠባበቅ ላይ።",
@@ -606,7 +584,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "prosopis.phase.carbon": "የካርቦን ሂሳብ አያያዝ",
     "prosopis.phase.carbon.status": "የ CSI ደረጃዎች በመጠባበቅ ላይ",
 
-    // ── Reports page ────────────────────────────────────────────────────
     "reports.title": "የፕሮጀክት ሪፖርቶች",
     "reports.description": "ለአፋር ፕሮሶፒስ ቢዮቻር ፕሮጀክት የክትትል፣ ማረጋገጫ እና የተገዥነት ሪፖርቶች",
     "reports.item.coverage": "ሩብ-ዓመታዊ የፕሮጀክት ሽፋን ሪፖርት",
@@ -620,7 +597,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "reports.badge.ready": "ዝግጁ",
     "reports.badge.pending": "በመጠባበቅ ላይ",
 
-    // ── Map page ────────────────────────────────────────────────────────
     "map.eyebrow": "የአፋር ፕሮሶፒስ ቢዮቻር · የመስክ ካርታ",
     "map.title": "የእቶን አካባቢዎች እና የምርት ሁኔታ",
     "map.stat.kilns": "እቶኖች",
@@ -638,7 +614,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "map.error.ona": "የ ONA ችግር፦ {error}",
     "map.error.clearance": "የማጽጃ ቅጽ ችግር፦ {error}",
 
-    // ── Kiln map (component) ───────────────────────────────────────────
     "kilnMap.fitToKilns": "ወደ እቶኖች አስተካክል",
     "kilnMap.legend.kilnStatus": "የእቶን ሁኔታ",
     "kilnMap.legend.mapMarkers": "የካርታ ምልክቶች",
@@ -656,7 +631,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "kilnMap.popup.last": "የቅርብ ጊዜ፦ {date} · {days}ቀናት ስራ ፈት",
     "kilnMap.popup.regainOnly": "ቀላል መዝገቦች ብቻ — የእይታ ጥራት/እርጥበት/ሙቀት አልተመዘገበም",
 
-    // ── Biochar dashboard: header / KPIs / tabs / footer ───────────────
     "biochar.eyebrow": "CARE ኢትዮጵያ · SoilWatch · የቢዮቻር ምርት",
     "biochar.title": "CSI Artisan Pro የክትትል ዳሽቦርድ",
     "biochar.period": "ጊዜ",
@@ -712,7 +686,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "biochar.ai.noAnswer": "ምላሽ የለም።",
     "biochar.ai.requestFailed": "ጥያቄው አልተሳካም። ግንኙነትዎን ያረጋግጡ።",
 
-    // ── Biochar alert / trend labels (from compute.ts) ──────────────────
     "biochar.alert.safetyIncident": "የደህንነት ክስተት",
     "biochar.alert.csiFailure": "የ CSI ውድቀት",
     "biochar.alert.durationOutOfRange": "ጊዜ ከክልል ውጪ",
@@ -722,7 +695,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "biochar.trend.stable": "የተረጋጋ",
     "biochar.trend.declining": "እየቀነሰ",
 
-    // ── Tab: Production ──────────────────────────────────────────────────
     "tabProduction.outputOverTime": "ውጤት በጊዜ ሂደት",
     "tabProduction.byKiln": "በእቶን",
     "tabProduction.byOperator": "በኦፕሬተር",
@@ -740,7 +712,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabProduction.smokeObservation": "የጭስ ምልከታ",
     "tabProduction.pyrolysisDuration": "የፓይሮላይሲስ ጊዜ",
 
-    // ── Tab: Quality ─────────────────────────────────────────────────────
     "tabQuality.heatmap": "CSI Artisan Pro የተገዥነት ካርታ (የመጨረሻዎቹ {n} ባችዎች)",
     "tabQuality.heatmap.desc": "እያንዳንዱ ረድፍ = አንድ መስፈርት · እያንዳንዱ አምድ = አንድ ባች",
     "tabQuality.col.requirement": "መስፈርት",
@@ -776,7 +747,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabQuality.req.photoSampleBag": "የናሙና ከረጢት ፎቶ ተነስቷል",
     "tabQuality.req.tempData": "የሙቀት ውሂብ (ፕሪሚየም)",
 
-    // ── Tab: Operations ──────────────────────────────────────────────────
     "tabOperations.showing": "እያሳየ ነው፦ {filter}",
     "tabOperations.clearFilter": "ማጣሪያ አጽዳ",
     "tabOperations.activeAlerts": "ባለፉት 30 ቀናት ንቁ ማንቂያዎች ({n})",
@@ -800,7 +770,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabOperations.alert.lateSubmission": "ባች {batch}፦ ከምርት በኋላ በ{days} ቀናት ውስጥ ቀርቧል (SLA፦ {sla}ቀናት)",
     "tabOperations.alert.idleKiln": "ለ{days} ቀናት ስራ ፈት፣ የመጨረሻ ባች {date}",
 
-    // ── Tab: Records ─────────────────────────────────────────────────────
     "tabRecords.wetBiochar": "እርጥብ ቢዮቻር",
     "tabRecords.wetBiochar.sub": "ጠቅላላ የተመረተ",
     "tabRecords.dryBiochar": "ደረቅ ቢዮቻር (ግምት)",
@@ -854,7 +823,6 @@ export const dictionaries: Record<Locale, Dictionary> = {
     "tabRecords.report.batchRecords": "የባች መዝገቦች",
     "tabRecords.report.dryNote": "ደረቅ ቢዮቻር በ{pct}% እርጥበት ተገምቷል፣ ሙሉ መዝገቦች ብቻ። tCO₂e የ CSI ደረጃ ማረጋገጫ በመጠባበቅ ላይ።",
 
-    // ── Enum display labels ─────────────────────────────────────────────
     "enum.quality.excellent": "እጅግ በጣም ጥሩ",
     "enum.quality.good": "ጥሩ",
     "enum.quality.fair": "መካከለኛ",

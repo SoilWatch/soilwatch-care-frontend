@@ -1,15 +1,16 @@
+import type { components } from "@/lib/api-types";
 import type { Batch } from "./data";
 import type { RegainDataSource } from "./regain";
 import { regainToBatch } from "./regain";
 
 const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
 
-export interface BiocharDataSource {
+// `batches` stays the frontend's richer Batch (narrower literal unions,
+// data_source tag) — only the wrapper shape is checked against the backend.
+type BackendBiocharResponse = components["schemas"]["BiocharDataSourceResponse"];
+
+export interface BiocharDataSource extends Omit<BackendBiocharResponse, "batches"> {
   batches: Batch[];
-  source: "ona" | "db";
-  formId?: string;
-  error?: string;
-  loadedAt: string;
 }
 
 async function fetchBatches(): Promise<BiocharDataSource> {
@@ -23,8 +24,8 @@ async function fetchBatches(): Promise<BiocharDataSource> {
         loadedAt: new Date().toISOString(),
       };
     }
-    const data: BiocharDataSource = await res.json();
-    return { ...data, batches: data.batches ?? [] };
+    const data: BackendBiocharResponse = await res.json();
+    return { ...data, batches: (data.batches ?? []) as Batch[] };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return {

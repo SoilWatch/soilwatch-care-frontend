@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LayoutDashboard, FlameKindling, MapPin, FileBarChart2, Menu, X } from "lucide-react";
+import { assetPath } from "@/lib/assetPath";
 
 const NAV = [
   { href: "/",        label: "Overview",   icon: LayoutDashboard },
@@ -17,10 +18,8 @@ export default function Sidebar({ userName }: { userName?: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Close when navigating
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
@@ -74,7 +73,7 @@ export default function Sidebar({ userName }: { userName?: string }) {
         <div className="px-4 py-4 border-b border-stone-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Image
-              src="/soilwatch-logo.jpg"
+              src={assetPath("/soilwatch-logo.jpg")}
               alt="SoilWatch"
               width={28}
               height={28}

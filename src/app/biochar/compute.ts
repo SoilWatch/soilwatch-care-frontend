@@ -42,22 +42,22 @@ export interface DashboardKpis {
   durationFlag: boolean;
 }
 
+// Regain records have no wet weight measurement — use dry_kg for those rows.
+const biocharKg = (b: Batch) =>
+  b.data_source === "regain_kiln_operator" ? b.dry_kg : b.biochar_wet_weight_kg;
+
 export function computeKpis(df: Batch[]): DashboardKpis {
   const activeCutoff = daysAgo(ACTIVE_WINDOW_DAYS);
-  const totalBiochar = df.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
+  const totalBiochar = df.reduce((s, b) => s + biocharKg(b), 0);
   const avgDuration = df.length ? df.reduce((s, b) => s + b.pyrolysis_duration_min, 0) / df.length : 0;
-  // dry_kg for regain rows is a bucket-count guess, not derived from wet
-  // weight — mixing it into dryBiochar can push the total above totalBiochar.
-  // Keep this scoped to full records so dry never exceeds wet.
-  const dryBiochar = df.filter(b => b.data_source !== "regain_kiln_operator")
-    .reduce((s, b) => s + b.dry_kg, 0);
+  const dryBiochar = df.reduce((s, b) => s + b.dry_kg, 0);
   return {
     totalBatches: df.length,
     monthBatches: df.filter(b => b.production_date >= daysAgo(30)).length,
     weekBatches:  df.filter(b => b.production_date >= daysAgo(7)).length,
     totalBiochar,
     dryBiochar,
-    monthBiochar: df.filter(b => b.production_date >= daysAgo(30)).reduce((s, b) => s + b.biochar_wet_weight_kg, 0),
+    monthBiochar: df.filter(b => b.production_date >= daysAgo(30)).reduce((s, b) => s + biocharKg(b), 0),
     activeKilns:  new Set(df.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size,
     totalKilns:   new Set(df.map(b => b.kiln_id)).size,
     activeOps:    new Set(df.filter(b => b.production_date >= activeCutoff).map(b => b.operator_name)).size,

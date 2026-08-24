@@ -47,7 +47,7 @@ function aggregateKilns(batches: Batch[]): KilnSummary[] {
     const lat = last.production_lat || 0;
     const lng = last.production_lon || 0;
     const daysIdle = daysBetween(last.production_date);
-    const totalKg = bs.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
+    const totalKg = bs.reduce((s, b) => s + (b.data_source === "regain_kiln_operator" ? b.dry_kg : b.biochar_wet_weight_kg), 0);
     const recent = bs.filter(b => daysBetween(b.production_date) <= 30);
     const safetyBatches = recent.filter(b => b.safety_incidents.toLowerCase() !== "none").length;
     const complianceFails = recent.filter(b => b.compliance_fails > 0).length;

@@ -21,7 +21,7 @@ export default async function MapPage() {
   batches.forEach(b => {
     const k = kilnSet.get(b.kiln_id) ?? { lat: b.production_lat, lon: b.production_lon, batches: 0, totalKg: 0, lastDate: "" };
     k.batches++;
-    k.totalKg += b.biochar_wet_weight_kg;
+    k.totalKg += b.data_source === "regain_kiln_operator" ? b.dry_kg : b.biochar_wet_weight_kg;
     if (b.production_date > k.lastDate) k.lastDate = b.production_date;
     kilnSet.set(b.kiln_id, k);
   });

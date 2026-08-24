@@ -14,13 +14,15 @@
     "@types/mapbox-gl": "^3.4.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
+    "g": "^2.0.1",
     "jose": "^6.2.3",
     "lucide-react": "^1.8.0",
     "mapbox-gl": "^3.21.0",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "vercel": "^59.5.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

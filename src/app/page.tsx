@@ -41,9 +41,10 @@ export default async function OverviewPage() {
   const weekCutoff    = daysAgo(7);
   const activeCutoff  = daysAgo(ACTIVE_WINDOW_DAYS);
 
-  const totalBiochar  = batches.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
-  const dryBiochar    = batches.filter(b => b.data_source !== "regain_kiln_operator")
-    .reduce((s, b) => s + b.dry_kg, 0);
+  const bKg = (b: (typeof batches)[0]) =>
+    b.data_source === "regain_kiln_operator" ? b.dry_kg : b.biochar_wet_weight_kg;
+  const totalBiochar  = batches.reduce((s, b) => s + bKg(b), 0);
+  const dryBiochar    = batches.reduce((s, b) => s + b.dry_kg, 0);
   const monthBatches  = batches.filter(b => b.production_date >= monthCutoff).length;
   const weekBatches   = batches.filter(b => b.production_date >= weekCutoff).length;
   const activeKilns   = new Set(batches.filter(b => b.production_date >= activeCutoff).map(b => b.kiln_id)).size;
@@ -176,7 +177,7 @@ export default async function OverviewPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border p-2.5" style={{ borderColor: C.border }}>
                     <p className="text-xs" style={{ color: C.muted }}>{t("overview.latestBatch.output")}</p>
-                    <p className="font-semibold" style={{ color: C.text }}>{latest.biochar_wet_weight_kg.toFixed(1)} kg</p>
+                    <p className="font-semibold" style={{ color: C.text }}>{bKg(latest).toFixed(1)} kg</p>
                     <p className="text-xs" style={{ color: C.muted }}>{qualityLabel(t, latest.biochar_visual_quality)}</p>
                   </div>
                   <div className="rounded-lg border p-2.5" style={{ borderColor: C.border }}>

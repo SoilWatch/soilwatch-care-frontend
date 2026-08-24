@@ -7,6 +7,14 @@ import type { Batch, FeedstockAppearance } from "../data";
 import { PYRO_MIN, PYRO_MAX } from "../data";
 import type { SiteTrend, OperatorScore } from "../compute";
 import { daysBetween } from "../compute";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import { feedstockLabel, smokeLabel } from "@/lib/i18n/enumLabels";
+
+const TREND_KEYS: Record<string, string> = {
+  Improving: "biochar.trend.improving",
+  Stable: "biochar.trend.stable",
+  Declining: "biochar.trend.declining",
+};
 
 const C = {
   brand: "#c2410c", brandDark: "#9a3412", brandLight: "#fff7ed",
@@ -45,6 +53,7 @@ interface Props {
 }
 
 export default function TabProduction({ df, siteTrends, operatorScores }: Props) {
+  const { t } = useLanguage();
   const kilnIds = [...new Set(df.map(b => b.kiln_id))].sort();
 
   // Daily timeline
@@ -79,12 +88,12 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
   // Feedstock / smoke / pyrolysis
   const fcMap: Record<string, number> = {};
   df.forEach(b => { fcMap[b.feedstock_appearance] = (fcMap[b.feedstock_appearance] ?? 0) + 1; });
-  const fcData = Object.entries(fcMap).map(([k, v]) => ({ name: k, value: v }));
+  const fcData = Object.entries(fcMap).map(([k, v]) => ({ key: k, name: feedstockLabel(t, k), value: v }));
 
   const smMap: Record<string, number> = {};
   df.forEach(b => { smMap[b.smoke_observation] = (smMap[b.smoke_observation] ?? 0) + 1; });
   const smOrder = ["none", "minimal", "moderate", "heavy", "very_heavy"];
-  const smData = Object.entries(smMap).sort((a, b) => smOrder.indexOf(a[0]) - smOrder.indexOf(b[0])).map(([k, v]) => ({ name: k, count: v }));
+  const smData = Object.entries(smMap).sort((a, b) => smOrder.indexOf(a[0]) - smOrder.indexOf(b[0])).map(([k, v]) => ({ key: k, name: smokeLabel(t, k), count: v }));
 
   const pyroData = [...df].sort((a, b) => a.production_date.localeCompare(b.production_date))
     .map(b => ({ batch: b.batch_id.slice(-3), min: b.pyrolysis_duration_min, kiln: b.kiln_id, inRange: b.c_duration_in_range }));
@@ -96,7 +105,7 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
   return (
     <div className="space-y-4">
       <Panel>
-        <SectionLabel>Output over time</SectionLabel>
+        <SectionLabel>{t("tabProduction.outputOverTime")}</SectionLabel>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={dailyData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" />
@@ -111,7 +120,7 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel>
-          <SectionLabel>By kiln</SectionLabel>
+          <SectionLabel>{t("tabProduction.byKiln")}</SectionLabel>
           <ResponsiveContainer width="100%" height={140}>
             <BarChart data={kilnSummary} layout="vertical" margin={{ top: 0, right: 64, left: 32, bottom: 0 }}>
               <XAxis type="number" tick={{ fontSize: 10 }} />
@@ -125,20 +134,20 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
           </ResponsiveContainer>
           <table className="w-full text-xs mt-3 border-t" style={{ borderColor: C.border }}>
             <thead><tr style={{ color: C.muted }}>
-              <th className="text-left py-1">Kiln</th>
-              <th className="text-right py-1">Score</th>
-              <th className="text-left py-1 pl-2">Trend</th>
-              <th className="text-right py-1">Batches</th>
+              <th className="text-left py-1">{t("tabProduction.col.kiln")}</th>
+              <th className="text-right py-1">{t("tabProduction.col.score")}</th>
+              <th className="text-left py-1 pl-2">{t("tabProduction.col.trend")}</th>
+              <th className="text-right py-1">{t("tabProduction.col.batches")}</th>
               <th className="text-right py-1">kg</th>
-              <th className="text-right py-1">Idle</th>
+              <th className="text-right py-1">{t("tabProduction.col.idle")}</th>
             </tr></thead>
             <tbody>{kilnSummary.map(r => {
-              const st = siteTrends.find(t => t.site === r.kiln_id);
+              const st = siteTrends.find(st2 => st2.site === r.kiln_id);
               return (
                 <tr key={r.kiln_id} className="border-t" style={{ borderColor: C.border }}>
                   <td className="py-1 font-medium">{r.kiln_id}</td>
                   <td className="text-right font-bold" style={{ color: st ? ragColor(st.rag) : C.muted }}>{st?.score ?? "—"}</td>
-                  <td className="py-1 pl-2">{st ? `${st.arrow} ${st.trend}` : "—"}</td>
+                  <td className="py-1 pl-2">{st ? `${st.arrow} ${t(TREND_KEYS[st.trend] ?? st.trend)}` : "—"}</td>
                   <td className="text-right">{r.batches}</td>
                   <td className="text-right">{r.totalKg.toFixed(0)}</td>
                   <td className="text-right">{r.days_idle}d</td>
@@ -149,7 +158,7 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
         </Panel>
 
         <Panel>
-          <SectionLabel>By operator</SectionLabel>
+          <SectionLabel>{t("tabProduction.byOperator")}</SectionLabel>
           <ResponsiveContainer width="100%" height={140}>
             <BarChart data={opSummary} layout="vertical" margin={{ top: 0, right: 64, left: 8, bottom: 0 }}>
               <XAxis type="number" tick={{ fontSize: 10 }} />
@@ -163,12 +172,12 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
           </ResponsiveContainer>
           <table className="w-full text-xs mt-3 border-t" style={{ borderColor: C.border }}>
             <thead><tr style={{ color: C.muted }}>
-              <th className="text-left py-1">Operator</th>
-              <th className="text-right py-1">Score</th>
-              <th className="text-left py-1 pl-2">Trend</th>
-              <th className="text-right py-1">Batches</th>
+              <th className="text-left py-1">{t("tabProduction.col.operator")}</th>
+              <th className="text-right py-1">{t("tabProduction.col.score")}</th>
+              <th className="text-left py-1 pl-2">{t("tabProduction.col.trend")}</th>
+              <th className="text-right py-1">{t("tabProduction.col.batches")}</th>
               <th className="text-right py-1">kg</th>
-              <th className="text-right py-1">Pass%</th>
+              <th className="text-right py-1">{t("tabProduction.col.passPct")}</th>
             </tr></thead>
             <tbody>{opSummary.map(r => {
               const os = operatorScores.find(o => o.operator === r.full_name);
@@ -176,7 +185,7 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
                 <tr key={r.full_name} className="border-t" style={{ borderColor: C.border }}>
                   <td className="py-1 font-medium">{r.full_name}</td>
                   <td className="text-right font-bold" style={{ color: os ? ragColor(os.rag) : C.muted }}>{os?.score ?? "—"}</td>
-                  <td className="py-1 pl-2">{os ? `${os.arrow} ${os.trend}` : "—"}</td>
+                  <td className="py-1 pl-2">{os ? `${os.arrow} ${t(TREND_KEYS[os.trend] ?? os.trend)}` : "—"}</td>
                   <td className="text-right">{r.batches}</td>
                   <td className="text-right">{r.totalKg.toFixed(0)}</td>
                   <td className="text-right">{(r.pass_rate * 100).toFixed(0)}%</td>
@@ -189,10 +198,9 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
 
       {siteTrends.length > 0 && (
         <Panel>
-          <SectionLabel>Site performance ranking</SectionLabel>
+          <SectionLabel>{t("tabProduction.sitePerformance")}</SectionLabel>
           <p className="text-xs mb-3" style={{ color: C.muted }}>
-            Score 0–100: quality (30) · CSI compliance (30) · duration (20) · activity (20).
-            Trend compares first vs second half of batches (≥4 required).
+            {t("tabProduction.sitePerformance.desc")}
           </p>
           <div className="flex flex-wrap gap-3 mb-4">
             {siteTrends.map(r => (
@@ -201,8 +209,8 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
                 <div className="text-[10px]" style={{ color: C.muted }}>#{r.rank}</div>
                 <div className="text-sm font-semibold mt-0.5 truncate" style={{ color: C.text }}>{r.site}</div>
                 <div className="text-3xl font-bold mt-1" style={{ color: ragColor(r.rag) }}>{r.score}</div>
-                <div className="text-sm">{r.arrow} {r.trend}</div>
-                <div className="text-[10px] mt-1" style={{ color: C.muted }}>{r.batches} batch(es) · {r.daysIdle}d idle</div>
+                <div className="text-sm">{r.arrow} {t(TREND_KEYS[r.trend] ?? r.trend)}</div>
+                <div className="text-[10px] mt-1" style={{ color: C.muted }}>{t("tabProduction.batchesIdle", { n: r.batches, days: r.daysIdle })}</div>
               </div>
             ))}
           </div>
@@ -211,34 +219,34 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Panel>
-          <SectionLabel>Feedstock condition</SectionLabel>
+          <SectionLabel>{t("tabProduction.feedstockCondition")}</SectionLabel>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={fcData} dataKey="value" nameKey="name" cx="50%" cy="50%"
                 outerRadius={65} innerRadius={28}
                 label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 labelLine={false}>
-                {fcData.map((e, i) => <Cell key={i} fill={FEED_COLOR[e.name as FeedstockAppearance] ?? "#a8a29e"} />)}
+                {fcData.map((e, i) => <Cell key={i} fill={FEED_COLOR[e.key as FeedstockAppearance] ?? "#a8a29e"} />)}
               </Pie>
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
         </Panel>
         <Panel>
-          <SectionLabel>Smoke observation</SectionLabel>
+          <SectionLabel>{t("tabProduction.smokeObservation")}</SectionLabel>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={smData} margin={{ top: 4, right: 8, bottom: 20, left: 0 }}>
               <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-30} textAnchor="end" interval={0} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Bar dataKey="count" radius={[3, 3, 0, 0]}>
-                {smData.map((e, i) => <Cell key={i} fill={SMOKE_COLOR[e.name] ?? "#a8a29e"} />)}
+                {smData.map((e, i) => <Cell key={i} fill={SMOKE_COLOR[e.key] ?? "#a8a29e"} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Panel>
         <Panel>
-          <SectionLabel>Pyrolysis duration</SectionLabel>
+          <SectionLabel>{t("tabProduction.pyrolysisDuration")}</SectionLabel>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={pyroData} layout="vertical" margin={{ top: 0, right: 52, bottom: 0, left: 24 }}>
               <XAxis type="number" domain={[0, pyroMax]} tick={{ fontSize: 9 }} />

@@ -1,6 +1,7 @@
 import { loadBiocharData } from "../biochar/ona";
 import { loadClearanceData } from "../biochar/clearance";
 import KilnMapClient from "@/components/KilnMapClient";
+import { getT } from "@/lib/i18n/server";
 
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -12,7 +13,7 @@ const C = {
 };
 
 export default async function MapPage() {
-  const [dataSource, clearanceData] = await Promise.all([loadBiocharData(), loadClearanceData()]);
+  const [dataSource, clearanceData, t] = await Promise.all([loadBiocharData(), loadClearanceData(), getT()]);
   const batches = dataSource.batches;
   const clearanceSites = clearanceData.sites;
 
@@ -40,18 +41,18 @@ export default async function MapPage() {
         style={{ background: "#0f172a", borderColor: "#1e293b" }}>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#fb923c" }}>
-            Afar Prosopis Biochar · Field Map
+            {t("map.eyebrow")}
           </p>
-          <h1 className="text-white text-lg font-bold leading-tight">Kiln Locations &amp; Production Status</h1>
+          <h1 className="text-white text-lg font-bold leading-tight">{t("map.title")}</h1>
         </div>
         {/* Stats */}
         <div className="flex gap-4 flex-wrap">
           {[
-            { label: "Kilns",     value: stats.kilns },
-            { label: "Batches",   value: stats.batches },
-            { label: "Operators", value: stats.operators },
-            { label: "CSI OK",    value: stats.csiOk },
-            { label: "Sites",     value: stats.clearanceSites },
+            { label: t("map.stat.kilns"),     value: stats.kilns },
+            { label: t("map.stat.batches"),   value: stats.batches },
+            { label: t("map.stat.operators"), value: stats.operators },
+            { label: t("map.stat.csiOk"),    value: stats.csiOk },
+            { label: t("map.stat.sites"),     value: stats.clearanceSites },
           ].map(s => (
             <div key={s.label} className="text-center">
               <div className="text-white font-bold text-lg leading-tight">{s.value}</div>
@@ -62,11 +63,11 @@ export default async function MapPage() {
         {/* Legend */}
         <div className="flex gap-3 flex-wrap">
           {[
-            { label: "Active",          color: C.success },
-            { label: "Idle",            color: C.warning },
-            { label: "Compliance",      color: C.brand },
-            { label: "Safety",          color: C.danger },
-            { label: "Clearance site",  color: "#22c55e" },
+            { label: t("map.legend.active"),          color: C.success },
+            { label: t("map.legend.idle"),            color: C.warning },
+            { label: t("map.legend.compliance"),      color: C.brand },
+            { label: t("map.legend.safety"),          color: C.danger },
+            { label: t("map.legend.clearanceSite"),  color: "#22c55e" },
           ].map(l => (
             <div key={l.label} className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ background: l.color }} />
@@ -80,9 +81,9 @@ export default async function MapPage() {
       {!MAPBOX_TOKEN ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-white font-semibold">Mapbox token not configured</p>
+            <p className="text-white font-semibold">{t("map.tokenMissing.title")}</p>
             <p className="text-sm mt-1" style={{ color: "#94a3b8" }}>
-              Set NEXT_PUBLIC_MAPBOX_TOKEN in your environment.
+              {t("map.tokenMissing.desc")}
             </p>
           </div>
         </div>
@@ -103,12 +104,12 @@ export default async function MapPage() {
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 max-w-sm w-full px-4 space-y-2">
           {dataSource.error && (
             <div className="rounded-xl border px-4 py-2 text-sm" style={{ background: "#7f1d1d", borderColor: C.danger, color: "#fecaca" }}>
-              ONA issue: {dataSource.error}
+              {t("map.error.ona", { error: dataSource.error })}
             </div>
           )}
           {clearanceData.error && (
             <div className="rounded-xl border px-4 py-2 text-sm" style={{ background: "#7f1d1d", borderColor: C.danger, color: "#fecaca" }}>
-              Clearance form issue: {clearanceData.error}
+              {t("map.error.clearance", { error: clearanceData.error })}
             </div>
           )}
         </div>

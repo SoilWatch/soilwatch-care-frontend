@@ -1,22 +1,26 @@
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
 import { FileText, Lock } from "lucide-react";
+import { getT } from "@/lib/i18n/server";
 
-const reports = [
-  { title: "Quarterly Project Coverage Report", status: "Template", standard: null },
-  { title: "Project Production Summary", status: "Available from ONA", standard: null },
-  { title: "VM0044 Carbon Accounting", status: "Pending factors", standard: "VM0044" },
-  { title: "CSI C-Sink Compliance Report", status: "Pending sensors", standard: "CSI C-Sink" },
-];
+export default async function ReportsPage() {
+  const t = await getT();
 
-export default function ReportsPage() {
+  const reports = [
+    { title: t("reports.item.coverage"),   status: t("reports.status.template"),         standard: null },
+    { title: t("reports.item.production"), status: t("reports.status.available"),        standard: null },
+    { title: t("reports.item.vm0044"),     status: t("reports.status.pendingFactors"),   standard: "VM0044" },
+    { title: t("reports.item.csi"),        status: t("reports.status.pendingSensors"),   standard: "CSI C-Sink" },
+  ];
+  const availableStatus = t("reports.status.available");
+
   return (
     <div className="min-h-full bg-white">
-      <PageHeader title="Project Reports" description="Monitoring, verification, and compliance reports for the Afar Prosopis Biochar project" />
+      <PageHeader title={t("reports.title")} description={t("reports.description")} />
 
       <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         {reports.map((report) => {
-          const available = report.status === "Available from ONA";
+          const available = report.status === availableStatus;
           return (
             <section key={report.title} className="bg-white rounded-lg border p-4" style={{ borderColor: "#e9ecef", opacity: available ? 1 : 0.78 }}>
               <div className="flex items-start justify-between gap-3">
@@ -31,7 +35,7 @@ export default function ReportsPage() {
                 </div>
                 <div className="flex gap-2">
                   {report.standard && <Badge label={report.standard} variant="carbon" />}
-                  <Badge label={available ? "Ready" : "Pending"} variant={available ? "green" : "stone"} />
+                  <Badge label={available ? t("reports.badge.ready") : t("reports.badge.pending")} variant={available ? "green" : "stone"} />
                 </div>
               </div>
             </section>

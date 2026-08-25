@@ -123,8 +123,6 @@ interface Props {
   mapboxToken: string;
   selectedKiln?: string | null;
   onKilnSelect?: (id: string | null) => void;
-  showFeedstockLines?: boolean;
-  showFeedstockMarkers?: boolean;
   style?: "satellite" | "streets";
 }
 
@@ -135,7 +133,6 @@ const STYLES = {
 
 export default function KilnMap({
   batches, clearanceSites = [], mapboxToken, selectedKiln, onKilnSelect,
-  showFeedstockLines = true, showFeedstockMarkers = true,
   style = "satellite",
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
@@ -262,81 +259,12 @@ export default function KilnMap({
 
     // Remove existing layers/sources
     ["kilns-glow", "kilns-circle", "kilns-label",
-     "feedstock-lines", "feedstock-markers",
      "clearance-fill", "clearance-outline", "clearance-label"].forEach(id => {
       if (m.getLayer(id)) m.removeLayer(id);
     });
-    ["kilns", "feedstock", "clearance"].forEach(id => {
+    ["kilns", "clearance"].forEach(id => {
       if (m.getSource(id)) m.removeSource(id);
     });
-
-    // Build feedstock source data (unique source locations per kiln)
-    const feedstockFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
-    const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-
-    if (showFeedstockLines || showFeedstockMarkers) {
-      kilns.forEach(kiln => {
-        const kb = batches.filter(b => b.kiln_id === kiln.id && b.feedstock_lat !== 0 && b.feedstock_lon !== 0);
-        const seen = new Set<string>();
-        kb.forEach(b => {
-          const key = `${b.feedstock_lat.toFixed(4)},${b.feedstock_lon.toFixed(4)}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          feedstockFeatures.push({
-            type: "Feature",
-            geometry: { type: "Point", coordinates: [b.feedstock_lon, b.feedstock_lat] },
-            properties: { kiln: kiln.id },
-          });
-          lineFeatures.push({
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: [[b.feedstock_lon, b.feedstock_lat], [kiln.lng, kiln.lat]] },
-            properties: {},
-          });
-        });
-      });
-    }
-
-    m.addSource("feedstock", {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [...feedstockFeatures, ...lineFeatures] },
-    });
-
-    if (showFeedstockLines) {
-      m.addLayer({
-        id: "feedstock-lines",
-        type: "line",
-        source: "feedstock",
-        filter: ["==", "$type", "LineString"],
-        paint: { "line-color": "#a8a29e", "line-width": 1, "line-dasharray": [3, 2], "line-opacity": 0.5 },
-      });
-    }
-
-    if (showFeedstockMarkers) {
-      m.addLayer({
-        id: "feedstock-markers",
-        type: "circle",
-        source: "feedstock",
-        filter: ["==", "$type", "Point"],
-        paint: { "circle-radius": 5, "circle-color": "#fb923c", "circle-opacity": 0.7, "circle-stroke-width": 1, "circle-stroke-color": "#fff" },
-      });
-
-      m.on("mouseenter", "feedstock-markers", e => {
-        m.getCanvas().style.cursor = "pointer";
-        const props = e.features?.[0]?.properties;
-        if (!props) return;
-        popup.current?.setLngLat(e.lngLat).setHTML(`
-          <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
-            <div style="font-weight:600;margin-bottom:4px">Feedstock source</div>
-            <div style="color:#78716c">Feeds ${props.kiln}</div>
-          </div>
-        `).addTo(m);
-      });
-      m.on("mousemove", "feedstock-markers", e => { popup.current?.setLngLat(e.lngLat); });
-      m.on("mouseleave", "feedstock-markers", () => {
-        m.getCanvas().style.cursor = "";
-        popup.current?.remove();
-      });
-    }
 
     // Clearance site polygons
     m.addSource("clearance", {
@@ -510,7 +438,7 @@ export default function KilnMap({
   useEffect(() => {
     if (ready) renderLayers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, batches, clearanceSites, showFeedstockLines, showFeedstockMarkers]);
+  }, [ready, batches, clearanceSites]);
 
   function fitToKilns() {
     if (!map.current || kilns.length === 0) return;
@@ -629,14 +557,6 @@ export default function KilnMap({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#22c55e", opacity: 0.6 }} />
             <span style={{ color: "#e7e5e4" }}>Clearance site</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#fb923c" }} />
-            <span style={{ color: "#e7e5e4" }}>Feedstock source</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-0 flex-shrink-0" style={{ borderTop: "1.5px dashed #a8a29e" }} />
-            <span style={{ color: "#e7e5e4" }}>Feedstock → kiln link</span>
           </div>
           {PROSOPIS_VERSIONS.map(version => (
             <div key={version.id} className="flex items-center gap-2">

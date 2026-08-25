@@ -3,9 +3,65 @@
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import parseGeoraster from "georaster";
+import { Maximize } from "lucide-react";
 import type { Batch } from "@/app/biochar/data";
 import { ACTIVE_WINDOW_DAYS } from "@/app/biochar/data";
 import type { ClearanceSite } from "@/app/biochar/clearance";
+
+interface ProsopisVersion {
+  id: string;
+  label: string;
+  url: string;
+  color: [number, number, number];
+}
+
+const PROSOPIS_VERSIONS: ProsopisVersion[] = [
+  { id: "v17", label: "Prosopis v17", url: "https://storage.googleapis.com/soilwatch-gee/Afar_Prosopis_v17_highConfidence.tif", color: [185, 28, 28] },
+  { id: "v19", label: "Prosopis v19", url: "https://storage.googleapis.com/soilwatch-gee/Afar_Prosopis_v19_highConfidence.tif", color: [234, 88, 12] },
+];
+const PROSOPIS_DEFAULT_OPACITY = 1;
+
+type ImageCoords = [[number, number], [number, number], [number, number], [number, number]];
+
+const MAX_CANVAS_DIMENSION = 2048;
+
+async function rasterToImageSource(url: string, color: [number, number, number]): Promise<{ dataUrl: string; coordinates: ImageCoords }> {
+  const response = await fetch(url);
+  const raster = await parseGeoraster(await response.arrayBuffer());
+  const { width: srcWidth, height: srcHeight, values, noDataValue, xmin, xmax, ymin, ymax } = raster;
+  const band = values[0];
+
+  const scale = Math.min(1, MAX_CANVAS_DIMENSION / Math.max(srcWidth, srcHeight));
+  const width = Math.max(1, Math.round(srcWidth * scale));
+  const height = Math.max(1, Math.round(srcHeight * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+  const image = ctx.createImageData(width, height);
+
+  for (let row = 0; row < height; row++) {
+    const srcRow = Math.min(srcHeight - 1, Math.floor(row / scale));
+    for (let col = 0; col < width; col++) {
+      const srcCol = Math.min(srcWidth - 1, Math.floor(col / scale));
+      const value = band[srcRow][srcCol];
+      const i = (row * width + col) * 4;
+      const detected = value !== noDataValue && value !== 0 && !Number.isNaN(value);
+      image.data[i] = color[0];
+      image.data[i + 1] = color[1];
+      image.data[i + 2] = color[2];
+      image.data[i + 3] = detected ? 255 : 0;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    coordinates: [[xmin, ymax], [xmax, ymax], [xmax, ymin], [xmin, ymin]],
+  };
+}
 
 const TODAY = new Date().toISOString().slice(0, 10);
 function daysBetween(d: string) {
@@ -87,6 +143,62 @@ export default function KilnMap({
   const popup = useRef<mapboxgl.Popup | null>(null);
   const [ready, setReady] = useState(false);
 
+  const prosopisCache = useRef<Record<string, { dataUrl: string; coordinates: ImageCoords }>>({});
+  const prosopisLoading = useRef<Record<string, boolean>>({});
+  const [prosopisVisible, setProsopisVisible] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(PROSOPIS_VERSIONS.map(v => [v.id, v.id === PROSOPIS_VERSIONS[0].id])),
+  );
+  const [prosopisOpacity, setProsopisOpacity] = useState<Record<string, number>>(
+    () => Object.fromEntries(PROSOPIS_VERSIONS.map(v => [v.id, PROSOPIS_DEFAULT_OPACITY])),
+  );
+  const [prosopisStatus, setProsopisStatus] = useState<Record<string, "idle" | "loading" | "ready" | "error">>(
+    () => Object.fromEntries(PROSOPIS_VERSIONS.map(v => [v.id, v.id === PROSOPIS_VERSIONS[0].id ? "loading" : "idle"])),
+  );
+
+  function loadProsopisVersion(version: ProsopisVersion) {
+    const m = map.current;
+    if (!m) return;
+
+    const sourceId = `prosopis-raster-${version.id}`;
+    const layerId = `prosopis-raster-layer-${version.id}`;
+
+    const addToMap = (cached: { dataUrl: string; coordinates: ImageCoords }) => {
+      if (!m.getSource(sourceId)) {
+        m.addSource(sourceId, { type: "image", url: cached.dataUrl, coordinates: cached.coordinates });
+      }
+      if (!m.getLayer(layerId)) {
+        m.addLayer({
+          id: layerId,
+          type: "raster",
+          source: sourceId,
+          layout: { visibility: prosopisVisible[version.id] ? "visible" : "none" },
+          paint: { "raster-opacity": prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY },
+        });
+      }
+    };
+
+    if (prosopisCache.current[version.id]) {
+      addToMap(prosopisCache.current[version.id]);
+      return;
+    }
+    if (prosopisLoading.current[version.id]) return;
+    prosopisLoading.current[version.id] = true;
+    setProsopisStatus(s => ({ ...s, [version.id]: "loading" }));
+
+    rasterToImageSource(version.url, version.color)
+      .then(result => {
+        prosopisCache.current[version.id] = result;
+        setProsopisStatus(s => ({ ...s, [version.id]: "ready" }));
+        addToMap(result);
+      })
+      .catch(() => setProsopisStatus(s => ({ ...s, [version.id]: "error" })))
+      .finally(() => { prosopisLoading.current[version.id] = false; });
+  }
+
+  function ensureProsopisLayers() {
+    PROSOPIS_VERSIONS.filter(version => prosopisVisible[version.id]).forEach(loadProsopisVersion);
+  }
+
   const kilns = aggregateKilns(batches);
   const maxKg = Math.max(...kilns.map(k => k.totalKg), 1);
 
@@ -126,7 +238,7 @@ export default function KilnMap({
         const sw: [number, number] = [Math.min(...validLngs), Math.min(...validLats)];
         const ne: [number, number] = [Math.max(...validLngs), Math.max(...validLats)];
         if (ne[0] - sw[0] > 0.001 || ne[1] - sw[1] > 0.001) {
-          map.current?.fitBounds([sw, ne], { padding: 80, maxZoom: 13 });
+          map.current?.fitBounds([sw, ne], { padding: 80, maxZoom: 11 });
         }
       }
       setReady(true);
@@ -207,6 +319,23 @@ export default function KilnMap({
         filter: ["==", "$type", "Point"],
         paint: { "circle-radius": 5, "circle-color": "#fb923c", "circle-opacity": 0.7, "circle-stroke-width": 1, "circle-stroke-color": "#fff" },
       });
+
+      m.on("mouseenter", "feedstock-markers", e => {
+        m.getCanvas().style.cursor = "pointer";
+        const props = e.features?.[0]?.properties;
+        if (!props) return;
+        popup.current?.setLngLat(e.lngLat).setHTML(`
+          <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
+            <div style="font-weight:600;margin-bottom:4px">Feedstock source</div>
+            <div style="color:#78716c">Feeds ${props.kiln}</div>
+          </div>
+        `).addTo(m);
+      });
+      m.on("mousemove", "feedstock-markers", e => { popup.current?.setLngLat(e.lngLat); });
+      m.on("mouseleave", "feedstock-markers", () => {
+        m.getCanvas().style.cursor = "";
+        popup.current?.remove();
+      });
     }
 
     // Clearance site polygons
@@ -249,7 +378,8 @@ export default function KilnMap({
       paint: { "text-color": "#fff", "text-halo-color": "#14532d", "text-halo-width": 1.5 },
     });
 
-    m.on("click", "clearance-fill", e => {
+    m.on("mouseenter", "clearance-fill", e => {
+      m.getCanvas().style.cursor = "pointer";
       const props = e.features?.[0]?.properties;
       if (!props) return;
       const date = props.submission_time ? new Date(props.submission_time).toLocaleDateString() : "—";
@@ -261,9 +391,11 @@ export default function KilnMap({
         </div>
       `).addTo(m);
     });
-
-    m.on("mouseenter", "clearance-fill", () => { m.getCanvas().style.cursor = "pointer"; });
-    m.on("mouseleave", "clearance-fill", () => { m.getCanvas().style.cursor = ""; });
+    m.on("mousemove", "clearance-fill", e => { popup.current?.setLngLat(e.lngLat); });
+    m.on("mouseleave", "clearance-fill", () => {
+      m.getCanvas().style.cursor = "";
+      popup.current?.remove();
+    });
 
     // Kiln source
     m.addSource("kilns", {
@@ -320,11 +452,16 @@ export default function KilnMap({
       paint: { "text-color": "#fff", "text-halo-color": "#1c1917", "text-halo-width": 1 },
     });
 
-    // Click interaction
     m.on("click", "kilns-circle", e => {
       const props = e.features?.[0]?.properties;
       if (!props) return;
       onKilnSelect?.(props.id);
+    });
+
+    m.on("mouseenter", "kilns-circle", e => {
+      m.getCanvas().style.cursor = "pointer";
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
       popup.current?.setLngLat(e.lngLat).setHTML(`
         <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
           <div style="font-weight:600;margin-bottom:4px">${props.id}</div>
@@ -337,14 +474,38 @@ export default function KilnMap({
         </div>
       `).addTo(m);
     });
-
-    m.on("mouseenter", "kilns-circle", () => { m.getCanvas().style.cursor = "pointer"; });
-    m.on("mouseleave", "kilns-circle", () => { m.getCanvas().style.cursor = ""; });
+    m.on("mousemove", "kilns-circle", e => { popup.current?.setLngLat(e.lngLat); });
+    m.on("mouseleave", "kilns-circle", () => {
+      m.getCanvas().style.cursor = "";
+      popup.current?.remove();
+    });
     m.on("click", e => {
       const features = m.queryRenderedFeatures(e.point, { layers: ["kilns-circle"] });
       if (!features.length) { popup.current?.remove(); onKilnSelect?.(null); }
     });
+
+    ensureProsopisLayers();
   }
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    PROSOPIS_VERSIONS.forEach(version => {
+      const layerId = `prosopis-raster-layer-${version.id}`;
+      if (!m.getLayer(layerId)) return;
+      m.setLayoutProperty(layerId, "visibility", prosopisVisible[version.id] ? "visible" : "none");
+    });
+  }, [prosopisVisible]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    PROSOPIS_VERSIONS.forEach(version => {
+      const layerId = `prosopis-raster-layer-${version.id}`;
+      if (!m.getLayer(layerId)) return;
+      m.setPaintProperty(layerId, "raster-opacity", prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY);
+    });
+  }, [prosopisOpacity]);
 
   useEffect(() => {
     if (ready) renderLayers();
@@ -361,21 +522,133 @@ export default function KilnMap({
     const lats = kilns.map(k => k.lat);
     map.current.fitBounds(
       [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: 80, maxZoom: 13 },
+      { padding: 80, maxZoom: 11 },
     );
   }
 
   return (
     <div className="relative w-full h-full">
       <div ref={container} className="w-full h-full" />
+
+      {/* Prosopis layer control */}
+      <div
+        className="absolute top-3 left-3 z-10 rounded-xl shadow-lg px-4 py-3.5 text-sm"
+        style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 240 }}
+      >
+        <p className="font-semibold text-xs uppercase tracking-wider mb-2.5" style={{ color: "#a8a29e" }}>
+          Prosopis extent (GEE)
+        </p>
+        {PROSOPIS_VERSIONS.map((version, i) => {
+          const status = prosopisStatus[version.id];
+          const visible = prosopisVisible[version.id];
+          const opacity = prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY;
+          return (
+            <div key={version.id} className={i > 0 ? "mt-3 pt-3 border-t" : ""} style={i > 0 ? { borderColor: "#44403c" } : undefined}>
+              <label className="flex items-center gap-2.5 cursor-pointer mb-2.5">
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setProsopisVisible(v => ({ ...v, [version.id]: checked }));
+                    if (checked) loadProsopisVersion(version);
+                  }}
+                  disabled={status === "loading"}
+                  style={{ width: 18, height: 18 }}
+                />
+                <span
+                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  style={{ background: `rgb(${version.color.join(",")})` }}
+                />
+                <span>
+                  {version.label} — {status === "loading" ? "Loading…" : status === "error" ? "Failed to load" : "Show"}
+                </span>
+              </label>
+              {status === "ready" && (
+                <div className={visible ? "" : "opacity-40 pointer-events-none"}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span style={{ color: "#a8a29e" }}>Opacity</span>
+                    <span>{Math.round(opacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    value={opacity}
+                    onChange={e => setProsopisOpacity(o => ({ ...o, [version.id]: Number(e.target.value) }))}
+                    className="w-full"
+                    style={{ height: 6 }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       {kilns.length > 0 && (
         <button
           onClick={fitToKilns}
-          className="absolute bottom-8 left-3 z-10 text-xs font-medium px-2.5 py-1.5 rounded-lg shadow transition-opacity hover:opacity-90"
-          style={{ background: "#1c1917", color: "#fff", opacity: 0.85 }}>
-          Fit to kilns
+          title="Fit to kilns"
+          aria-label="Fit to kilns"
+          className="absolute z-10 flex items-center justify-center rounded hover:bg-stone-50 transition-colors"
+          style={{ top: 82, right: 10, width: 29, height: 29, background: "#fff", boxShadow: "0 0 0 2px rgba(0,0,0,0.1)" }}>
+          <Maximize size={15} color="#333" />
         </button>
       )}
+
+      <div
+        className="absolute bottom-8 right-3 z-10 rounded-xl shadow-lg px-3.5 py-3 text-xs"
+        style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 180 }}
+      >
+        <p className="font-semibold text-[10px] uppercase tracking-wider mb-2" style={{ color: "#a8a29e" }}>
+          Kiln status
+        </p>
+        <div className="space-y-1.5">
+          {([
+            ["active", "Active — producing, no flags"],
+            ["idle", `Idle — no batches in ${ACTIVE_WINDOW_DAYS}d`],
+            ["compliance", "Compliance flag — CSI requirement(s) failed"],
+            ["safety", "Safety incident reported"],
+          ] as [KilnStatus, string][]).map(([status, label]) => (
+            <div key={status} className="flex items-center gap-2">
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ background: STATUS_COLOR[status] }}
+              />
+              <span style={{ color: "#e7e5e4" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        <p className="font-semibold text-[10px] uppercase tracking-wider mt-3 mb-2 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>
+          Map markers
+        </p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#22c55e", opacity: 0.6 }} />
+            <span style={{ color: "#e7e5e4" }}>Clearance site</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#fb923c" }} />
+            <span style={{ color: "#e7e5e4" }}>Feedstock source</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-0 flex-shrink-0" style={{ borderTop: "1.5px dashed #a8a29e" }} />
+            <span style={{ color: "#e7e5e4" }}>Feedstock → kiln link</span>
+          </div>
+          {PROSOPIS_VERSIONS.map(version => (
+            <div key={version.id} className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: `rgb(${version.color.join(",")})` }} />
+              <span style={{ color: "#e7e5e4" }}>{version.label} (GEE)</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] mt-2.5 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>
+          Kiln marker size = biochar output
+        </p>
+      </div>
     </div>
   );
 }

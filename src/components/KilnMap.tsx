@@ -532,10 +532,10 @@ export default function KilnMap({
 
       {/* Prosopis layer control */}
       <div
-        className="absolute top-3 left-3 z-10 rounded-xl shadow-lg px-4 py-3.5 text-sm"
-        style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 240 }}
+        className="absolute top-3 left-3 z-10 rounded-xl shadow-lg px-3.5 py-3 text-xs"
+        style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 190 }}
       >
-        <p className="font-semibold text-xs uppercase tracking-wider mb-2.5" style={{ color: "#a8a29e" }}>
+        <p className="font-semibold text-[10px] uppercase tracking-wider mb-2" style={{ color: "#a8a29e" }}>
           Prosopis extent (GEE)
         </p>
         {PROSOPIS_VERSIONS.map((version, i) => {
@@ -543,8 +543,8 @@ export default function KilnMap({
           const visible = prosopisVisible[version.id];
           const opacity = prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY;
           return (
-            <div key={version.id} className={i > 0 ? "mt-3 pt-3 border-t" : ""} style={i > 0 ? { borderColor: "#44403c" } : undefined}>
-              <label className="flex items-center gap-2.5 cursor-pointer mb-2.5">
+            <div key={version.id} className={i > 0 ? "mt-2 pt-2 border-t" : ""} style={i > 0 ? { borderColor: "#44403c" } : undefined}>
+              <label className="flex items-center gap-2 cursor-pointer mb-1.5">
                 <input
                   type="checkbox"
                   checked={visible}
@@ -554,10 +554,10 @@ export default function KilnMap({
                     if (checked) loadProsopisVersion(version);
                   }}
                   disabled={status === "loading"}
-                  style={{ width: 18, height: 18 }}
+                  style={{ width: 14, height: 14 }}
                 />
                 <span
-                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  className="w-2 h-2 rounded-sm flex-shrink-0"
                   style={{ background: `rgb(${version.color.join(",")})` }}
                 />
                 <span>
@@ -566,7 +566,7 @@ export default function KilnMap({
               </label>
               {status === "ready" && (
                 <div className={visible ? "" : "opacity-40 pointer-events-none"}>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1">
                     <span style={{ color: "#a8a29e" }}>Opacity</span>
                     <span>{Math.round(opacity * 100)}%</span>
                   </div>
@@ -578,7 +578,7 @@ export default function KilnMap({
                     value={opacity}
                     onChange={e => setProsopisOpacity(o => ({ ...o, [version.id]: Number(e.target.value) }))}
                     className="w-full"
-                    style={{ height: 6 }}
+                    style={{ height: 4 }}
                   />
                 </div>
               )}

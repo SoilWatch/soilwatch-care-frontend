@@ -8,6 +8,7 @@ import { Maximize } from "lucide-react";
 import type { Batch } from "@/app/biochar/data";
 import { ACTIVE_WINDOW_DAYS } from "@/app/biochar/data";
 import type { ClearanceSite } from "@/app/biochar/clearance";
+import type { FieldTrialSite } from "@/app/biochar/fieldtrials";
 
 interface ProsopisVersion {
   id: string;
@@ -120,6 +121,7 @@ function aggregateKilns(batches: Batch[]): KilnSummary[] {
 interface Props {
   batches: Batch[];
   clearanceSites?: ClearanceSite[];
+  fieldTrialSites?: FieldTrialSite[];
   mapboxToken: string;
   selectedKiln?: string | null;
   onKilnSelect?: (id: string | null) => void;
@@ -132,7 +134,7 @@ const STYLES = {
 };
 
 export default function KilnMap({
-  batches, clearanceSites = [], mapboxToken, selectedKiln, onKilnSelect,
+  batches, clearanceSites = [], fieldTrialSites = [], mapboxToken, selectedKiln, onKilnSelect,
   style = "satellite",
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
@@ -259,10 +261,11 @@ export default function KilnMap({
 
     // Remove existing layers/sources
     ["kilns-glow", "kilns-circle", "kilns-label",
-     "clearance-fill", "clearance-outline", "clearance-label"].forEach(id => {
+     "clearance-fill", "clearance-outline", "clearance-label",
+     "field-trial-fill", "field-trial-outline", "field-trial-label"].forEach(id => {
       if (m.getLayer(id)) m.removeLayer(id);
     });
-    ["kilns", "clearance"].forEach(id => {
+    ["kilns", "clearance", "field-trials"].forEach(id => {
       if (m.getSource(id)) m.removeSource(id);
     });
 
@@ -321,6 +324,65 @@ export default function KilnMap({
     });
     m.on("mousemove", "clearance-fill", e => { popup.current?.setLngLat(e.lngLat); });
     m.on("mouseleave", "clearance-fill", () => {
+      m.getCanvas().style.cursor = "";
+      popup.current?.remove();
+    });
+
+    // Field trial polygons (red)
+    m.addSource("field-trials", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: fieldTrialSites.map(s => ({
+          type: "Feature" as const,
+          geometry: s.polygon,
+          properties: { site_id: s.site_id, submission_time: s.submission_time },
+        })),
+      },
+    });
+
+    m.addLayer({
+      id: "field-trial-fill",
+      type: "fill",
+      source: "field-trials",
+      paint: { "fill-color": "#ef4444", "fill-opacity": 0.18 },
+    });
+
+    m.addLayer({
+      id: "field-trial-outline",
+      type: "line",
+      source: "field-trials",
+      paint: { "line-color": "#ef4444", "line-width": 2, "line-opacity": 0.85 },
+    });
+
+    m.addLayer({
+      id: "field-trial-label",
+      type: "symbol",
+      source: "field-trials",
+      layout: {
+        "text-field": ["get", "site_id"],
+        "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+        "text-size": 11,
+        "text-anchor": "center",
+      },
+      paint: { "text-color": "#fff", "text-halo-color": "#7f1d1d", "text-halo-width": 1.5 },
+    });
+
+    m.on("mouseenter", "field-trial-fill", e => {
+      m.getCanvas().style.cursor = "pointer";
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
+      const date = props.submission_time ? new Date(props.submission_time).toLocaleDateString() : "—";
+      popup.current?.setLngLat(e.lngLat).setHTML(`
+        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
+          <div style="font-weight:600;margin-bottom:4px">Field Trial</div>
+          <div style="color:#78716c">ID: ${props.site_id}</div>
+          <div style="color:#78716c">Submitted: ${date}</div>
+        </div>
+      `).addTo(m);
+    });
+    m.on("mousemove", "field-trial-fill", e => { popup.current?.setLngLat(e.lngLat); });
+    m.on("mouseleave", "field-trial-fill", () => {
       m.getCanvas().style.cursor = "";
       popup.current?.remove();
     });
@@ -438,7 +500,7 @@ export default function KilnMap({
   useEffect(() => {
     if (ready) renderLayers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, batches, clearanceSites]);
+  }, [ready, batches, clearanceSites, fieldTrialSites]);
 
   function fitToKilns() {
     if (!map.current || kilns.length === 0) return;
@@ -557,6 +619,10 @@ export default function KilnMap({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#22c55e", opacity: 0.6 }} />
             <span style={{ color: "#e7e5e4" }}>Clearance site</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#ef4444", opacity: 0.6 }} />
+            <span style={{ color: "#e7e5e4" }}>Field trial</span>
           </div>
           {PROSOPIS_VERSIONS.map(version => (
             <div key={version.id} className="flex items-center gap-2">

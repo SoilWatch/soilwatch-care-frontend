@@ -333,10 +333,15 @@ export default function KilnMap({
       type: "geojson",
       data: {
         type: "FeatureCollection",
-        features: fieldTrialSites.map(s => ({
+        features: fieldTrialSites.map((s, i) => ({
           type: "Feature" as const,
           geometry: s.polygon,
-          properties: { site_id: s.site_id, submission_time: s.submission_time },
+          properties: {
+            site_id: s.site_id,
+            submission_id: s.submission_id,
+            submission_time: s.submission_time,
+            index: i + 1,
+          },
         })),
       },
     });
@@ -345,14 +350,14 @@ export default function KilnMap({
       id: "field-trial-fill",
       type: "fill",
       source: "field-trials",
-      paint: { "fill-color": "#ef4444", "fill-opacity": 0.18 },
+      paint: { "fill-color": "#ef4444", "fill-opacity": 0.15 },
     });
 
     m.addLayer({
       id: "field-trial-outline",
       type: "line",
       source: "field-trials",
-      paint: { "line-color": "#ef4444", "line-width": 2, "line-opacity": 0.85 },
+      paint: { "line-color": "#ef4444", "line-width": 2, "line-opacity": 0.9 },
     });
 
     m.addLayer({
@@ -368,23 +373,29 @@ export default function KilnMap({
       paint: { "text-color": "#fff", "text-halo-color": "#7f1d1d", "text-halo-width": 1.5 },
     });
 
-    m.on("mouseenter", "field-trial-fill", e => {
-      m.getCanvas().style.cursor = "pointer";
+    m.on("mouseenter", "field-trial-fill", () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", "field-trial-fill", () => { m.getCanvas().style.cursor = ""; });
+
+    m.on("click", "field-trial-fill", e => {
       const props = e.features?.[0]?.properties;
       if (!props) return;
-      const date = props.submission_time ? new Date(props.submission_time).toLocaleDateString() : "—";
-      popup.current?.setLngLat(e.lngLat).setHTML(`
-        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
-          <div style="font-weight:600;margin-bottom:4px">Field Trial</div>
-          <div style="color:#78716c">ID: ${props.site_id}</div>
-          <div style="color:#78716c">Submitted: ${date}</div>
-        </div>
-      `).addTo(m);
-    });
-    m.on("mousemove", "field-trial-fill", e => { popup.current?.setLngLat(e.lngLat); });
-    m.on("mouseleave", "field-trial-fill", () => {
-      m.getCanvas().style.cursor = "";
-      popup.current?.remove();
+      const date = props.submission_time
+        ? new Date(props.submission_time).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+        : "—";
+      popup.current
+        ?.setLngLat(e.lngLat)
+        .setHTML(`
+          <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
+            <div style="font-weight:600;margin-bottom:4px">${props.site_id}</div>
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#ef4444"></span>
+              <span>Field Trial</span>
+            </div>
+            <div style="color:#78716c">ONA ID: ${props.submission_id}</div>
+            <div style="color:#78716c">Submitted: ${date}</div>
+          </div>
+        `)
+        .addTo(m);
     });
 
     // Kiln source
@@ -470,8 +481,8 @@ export default function KilnMap({
       popup.current?.remove();
     });
     m.on("click", e => {
-      const features = m.queryRenderedFeatures(e.point, { layers: ["kilns-circle"] });
-      if (!features.length) { popup.current?.remove(); onKilnSelect?.(null); }
+      const hit = m.queryRenderedFeatures(e.point, { layers: ["kilns-circle", "field-trial-fill", "clearance-fill"] });
+      if (!hit.length) { popup.current?.remove(); onKilnSelect?.(null); }
     });
 
     ensureProsopisLayers();

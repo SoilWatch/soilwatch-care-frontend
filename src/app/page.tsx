@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { loadBiocharData } from "./biochar/ona";
+
+export const dynamic = "force-dynamic";
 import { ACTIVE_WINDOW_DAYS, COMPLIANCE_WINDOW_DAYS, MOISTURE_ESTIMATE } from "./biochar/data";
 import { getT } from "@/lib/i18n/server";
 import { qualityLabel } from "@/lib/i18n/enumLabels";

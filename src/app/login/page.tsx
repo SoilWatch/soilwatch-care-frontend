@@ -2,16 +2,17 @@
 
 import { useState, FormEvent, useId } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-// ── Shared input ────────────────────────────────────────────────────────────
+// ── Input field ──────────────────────────────────────────────────────────────
+
 function Field({
-  label, type = "text", value, onChange, placeholder, hint, autoComplete,
+  label, type = "text", value, onChange, placeholder, autoComplete,
 }: {
   label: string; type?: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; hint?: string; autoComplete?: string;
+  placeholder?: string; autoComplete?: string;
 }) {
   const { t } = useLanguage();
   const id = useId();
@@ -20,9 +21,7 @@ function Field({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-semibold text-slate-500">
-        {label}
-      </label>
+      <label htmlFor={id} className="text-xs font-semibold text-slate-500">{label}</label>
       <div className="relative">
         <input
           id={id}
@@ -50,10 +49,11 @@ function Field({
           </button>
         )}
       </div>
-      {hint && <p className="text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
+
+// ── Error banner ──────────────────────────────────────────────────────────────
 
 function ErrorBanner({ msg }: { msg: string }) {
   return (
@@ -66,126 +66,40 @@ function ErrorBanner({ msg }: { msg: string }) {
   );
 }
 
-// ── Sign-in form ────────────────────────────────────────────────────────────
-function SignInForm() {
-  const { t } = useLanguage();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+// ── Page ──────────────────────────────────────────────────────────────────────
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? t("login.error.loginFailed")); return; }
-      window.location.href = "/";
-    } catch {
-      setError(t("login.error.network"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <ErrorBanner msg={error} />}
-      <Field label={t("login.field.email")} type="email" value={email} onChange={setEmail}
-        placeholder={t("login.placeholder.email")} autoComplete="email" />
-      <Field label={t("login.field.password")} type="password" value={password} onChange={setPassword}
-        placeholder={t("login.placeholder.password")} autoComplete="current-password" />
-      <button
-        type="submit"
-        disabled={loading}
-        className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-all disabled:opacity-60"
-        style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}
-      >
-        {loading
-          ? <><Loader2 size={15} className="animate-spin" />{t("login.signingIn")}</>
-          : <><span>{t("login.signIn")}</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
-        }
-      </button>
-    </form>
-  );
-}
-
-// ── Register form ───────────────────────────────────────────────────────────
-function RegisterForm({ onRegistered }: { onRegistered: () => void }) {
-  const { t } = useLanguage();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, confirm }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? t("login.error.registrationFailed")); return; }
-      onRegistered();
-    } catch {
-      setError(t("login.error.network"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="text-xs text-slate-400 leading-relaxed">
-        {t("login.registerNotice.prefix")}{" "}
-        <span className="font-medium text-slate-500">@soilwatch.eu · @care.org · @care.et</span>.
-        {" "}{t("login.registerNotice.suffix")}
-      </p>
-      {error && <ErrorBanner msg={error} />}
-      <Field label={t("login.field.fullName")} value={name} onChange={setName}
-        placeholder={t("login.placeholder.fullName")} autoComplete="name" />
-      <Field label={t("login.field.email")} type="email" value={email} onChange={setEmail}
-        placeholder={t("login.placeholder.email")} autoComplete="email" />
-      <Field label={t("login.field.password")} type="password" value={password} onChange={setPassword}
-        hint={t("login.field.passwordHint")} autoComplete="new-password" />
-      <Field label={t("login.field.confirmPassword")} type="password" value={confirm} onChange={setConfirm}
-        autoComplete="new-password" />
-      <button
-        type="submit"
-        disabled={loading}
-        className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-all disabled:opacity-60"
-        style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}
-      >
-        {loading
-          ? <><Loader2 size={15} className="animate-spin" />{t("login.creatingAccount")}</>
-          : <><span>{t("login.createAccount")}</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
-        }
-      </button>
-    </form>
-  );
-}
-
-// ── Page ────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const { t } = useLanguage();
-  const [tab, setTab] = useState<"signin" | "register">("signin");
-  const [registered, setRegistered] = useState(false);
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
 
-  function handleRegistered() {
-    setRegistered(true);
-    setTab("signin");
+  const redirectTo = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("from") ?? "/"
+    : "/";
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/auth/login", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? t("login.error.loginFailed"));
+        return;
+      }
+      window.location.href = redirectTo;
+    } catch {
+      setError(t("login.error.network"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -210,51 +124,41 @@ export default function LoginPage() {
         />
         <div className="text-center">
           <p className="font-bold text-base" style={{ color: "#0f172a" }}>{t("login.brand")}</p>
-          <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>
-            {t("login.subtitle")}
-          </p>
+          <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{t("login.subtitle")}</p>
         </div>
       </div>
 
       {/* Card */}
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-
-        {/* Tab toggle */}
-        <div className="flex border-b border-slate-100">
-          {(["signin", "register"] as const).map(tabId => (
-            <button
-              key={tabId}
-              type="button"
-              onClick={() => setTab(tabId)}
-              className="flex-1 py-3.5 text-sm font-medium transition-colors"
-              style={{
-                color: tab === tabId ? "#0f172a" : "#94a3b8",
-                borderBottom: tab === tabId ? "2px solid #0f172a" : "2px solid transparent",
-                background: "transparent",
-              }}
-            >
-              {tabId === "signin" ? t("login.tab.signin") : t("login.tab.register")}
-            </button>
-          ))}
+        <div className="px-6 pt-5 pb-1">
+          <h1 className="text-sm font-bold text-slate-800">{t("login.tab.signin")}</h1>
+          <p className="text-xs text-slate-400 mt-0.5">{t("login.subtitle2fa")}</p>
         </div>
 
-        <div className="px-6 py-6">
-          {registered && tab === "signin" && (
-            <div className="mb-5 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              <CheckCircle2 size={15} className="flex-shrink-0 text-emerald-500" />
-              {t("login.registered")}
-            </div>
-          )}
-          {tab === "signin"
-            ? <SignInForm />
-            : <RegisterForm onRegistered={handleRegistered} />
-          }
-        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {error && <ErrorBanner msg={error} />}
+          <Field
+            label={t("login.field.email")} type="email" value={email} onChange={setEmail}
+            placeholder={t("login.placeholder.email")} autoComplete="email"
+          />
+          <Field
+            label={t("login.field.password")} type="password" value={password} onChange={setPassword}
+            placeholder={t("login.placeholder.password")} autoComplete="current-password"
+          />
+          <button
+            type="submit" disabled={loading || !email || !password}
+            className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-all disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}
+          >
+            {loading
+              ? <><Loader2 size={15} className="animate-spin" />{t("login.signingIn")}</>
+              : <><span>{t("login.signIn")}</span><ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></>
+            }
+          </button>
+        </form>
       </div>
 
-      <p className="mt-6 text-xs" style={{ color: "#cbd5e1" }}>
-        {t("login.footer")}
-      </p>
+      <p className="mt-6 text-xs" style={{ color: "#cbd5e1" }}>{t("login.footer")}</p>
     </div>
   );
 }

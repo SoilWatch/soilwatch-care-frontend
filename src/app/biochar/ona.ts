@@ -60,7 +60,13 @@ async function fetchRegainRecords(): Promise<Batch[]> {
 export async function loadBiocharData(): Promise<BiocharDataSource> {
   const [base, regainBatches] = await Promise.all([fetchBatches(), fetchRegainRecords()]);
 
-  const taggedBatches = base.batches.map((b) => ({ ...b, data_source: "biochar_batch" as const }));
+  // Backend includes regain records as shadow entries in /api/batches
+  // (batch-1…batch-N, wet=0, dry=0). Drop any record where both weights
+  // are zero — they carry no data and the real regain records come from
+  // fetchRegainRecords() with the correct LOT-* IDs and actual dry_kg.
+  const taggedBatches = base.batches
+    .filter((b) => b.biochar_wet_weight_kg > 0 || b.dry_kg > 0)
+    .map((b) => ({ ...b, data_source: "biochar_batch" as const }));
 
   return {
     ...base,

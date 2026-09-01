@@ -7,21 +7,34 @@ import parseGeoraster from "georaster";
 import type { Batch } from "@/app/biochar/data";
 import { ACTIVE_WINDOW_DAYS } from "@/app/biochar/data";
 import type { ClearanceSite } from "@/app/biochar/clearance";
+import type { FieldTrialSite } from "@/app/biochar/fieldtrials";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
-const PROSOPIS_RASTER_URL = "https://storage.googleapis.com/soilwatch-gee/Afar_Prosopis_v17_highConfidence.tif";
-const PROSOPIS_SOURCE_ID = "prosopis-raster";
-const PROSOPIS_LAYER_ID = "prosopis-raster-layer";
-const PROSOPIS_COLOR: [number, number, number] = [217, 70, 32];
-const PROSOPIS_DEFAULT_OPACITY = 0.65;
+interface ProsopisVersion {
+  id: string;
+  label: string;
+  url: string;
+  color: [number, number, number];
+}
+
+const PROSOPIS_VERSIONS: ProsopisVersion[] = [
+  { id: "v17", label: "Prosopis v17", url: "https://storage.googleapis.com/soilwatch-gee/Afar_Prosopis_v17_highConfidence.tif", color: [185, 28, 28] },
+  { id: "v19", label: "Prosopis v19", url: "https://storage.googleapis.com/soilwatch-gee/Afar_Prosopis_v19_highConfidence.tif", color: [234, 88, 12] },
+];
+const PROSOPIS_DEFAULT_OPACITY = 1;
+const MAX_CANVAS_DIMENSION = 2048;
 
 type ImageCoords = [[number, number], [number, number], [number, number], [number, number]];
 
-async function rasterToImageSource(url: string): Promise<{ dataUrl: string; coordinates: ImageCoords }> {
+async function rasterToImageSource(url: string, color: [number, number, number]): Promise<{ dataUrl: string; coordinates: ImageCoords }> {
   const response = await fetch(url);
   const raster = await parseGeoraster(await response.arrayBuffer());
-  const { width, height, values, noDataValue, xmin, xmax, ymin, ymax } = raster;
+  const { width: srcWidth, height: srcHeight, values, noDataValue, xmin, xmax, ymin, ymax } = raster;
   const band = values[0];
+
+  const scale = Math.min(1, MAX_CANVAS_DIMENSION / Math.max(srcWidth, srcHeight));
+  const width = Math.max(1, Math.round(srcWidth * scale));
+  const height = Math.max(1, Math.round(srcHeight * scale));
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -30,13 +43,15 @@ async function rasterToImageSource(url: string): Promise<{ dataUrl: string; coor
   const image = ctx.createImageData(width, height);
 
   for (let row = 0; row < height; row++) {
+    const srcRow = Math.min(srcHeight - 1, Math.floor(row / scale));
     for (let col = 0; col < width; col++) {
-      const value = band[row][col];
+      const srcCol = Math.min(srcWidth - 1, Math.floor(col / scale));
+      const value = band[srcRow][srcCol];
       const i = (row * width + col) * 4;
       const detected = value !== noDataValue && value !== 0 && !Number.isNaN(value);
-      image.data[i] = PROSOPIS_COLOR[0];
-      image.data[i + 1] = PROSOPIS_COLOR[1];
-      image.data[i + 2] = PROSOPIS_COLOR[2];
+      image.data[i] = color[0];
+      image.data[i + 1] = color[1];
+      image.data[i + 2] = color[2];
       image.data[i + 3] = detected ? 255 : 0;
     }
   }
@@ -115,6 +130,7 @@ function aggregateKilns(batches: Batch[]): KilnSummary[] {
 interface Props {
   batches: Batch[];
   clearanceSites?: ClearanceSite[];
+  fieldTrialSites?: FieldTrialSite[];
   mapboxToken: string;
   selectedKiln?: string | null;
   onKilnSelect?: (id: string | null) => void;
@@ -127,7 +143,7 @@ const STYLES = {
 };
 
 export default function KilnMap({
-  batches, clearanceSites = [], mapboxToken, selectedKiln, onKilnSelect,
+  batches, clearanceSites = [], fieldTrialSites = [], mapboxToken, selectedKiln, onKilnSelect,
   style = "satellite",
 }: Props) {
   const { t } = useLanguage();
@@ -136,46 +152,60 @@ export default function KilnMap({
   const popup = useRef<mapboxgl.Popup | null>(null);
   const [ready, setReady] = useState(false);
 
-  const prosopisCache = useRef<{ dataUrl: string; coordinates: ImageCoords } | null>(null);
-  const prosopisLoading = useRef(false);
-  const [prosopisVisible, setProsopisVisible] = useState(true);
-  const [prosopisOpacity, setProsopisOpacity] = useState(PROSOPIS_DEFAULT_OPACITY);
-  const [prosopisStatus, setProsopisStatus] = useState<"loading" | "ready" | "error">("loading");
+  const prosopisCache = useRef<Record<string, { dataUrl: string; coordinates: ImageCoords }>>({});
+  const prosopisLoading = useRef<Record<string, boolean>>({});
+  const [prosopisVisible, setProsopisVisible] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(PROSOPIS_VERSIONS.map(v => [v.id, v.id === PROSOPIS_VERSIONS[0].id])),
+  );
+  const [prosopisOpacity, setProsopisOpacity] = useState<Record<string, number>>(
+    () => Object.fromEntries(PROSOPIS_VERSIONS.map(v => [v.id, PROSOPIS_DEFAULT_OPACITY])),
+  );
+  const [prosopisStatus, setProsopisStatus] = useState<Record<string, "idle" | "loading" | "ready" | "error">>(
+    () => Object.fromEntries(PROSOPIS_VERSIONS.map(v => [v.id, v.id === PROSOPIS_VERSIONS[0].id ? "loading" : "idle"])),
+  );
 
-  function ensureProsopisLayer() {
+  function loadProsopisVersion(version: ProsopisVersion) {
     const m = map.current;
     if (!m) return;
 
+    const sourceId = `prosopis-raster-${version.id}`;
+    const layerId = `prosopis-raster-layer-${version.id}`;
+
     const addToMap = (cached: { dataUrl: string; coordinates: ImageCoords }) => {
-      if (!m.getSource(PROSOPIS_SOURCE_ID)) {
-        m.addSource(PROSOPIS_SOURCE_ID, { type: "image", url: cached.dataUrl, coordinates: cached.coordinates });
+      if (!m.getSource(sourceId)) {
+        m.addSource(sourceId, { type: "image", url: cached.dataUrl, coordinates: cached.coordinates });
       }
-      if (!m.getLayer(PROSOPIS_LAYER_ID)) {
+      if (!m.getLayer(layerId)) {
         m.addLayer({
-          id: PROSOPIS_LAYER_ID,
+          id: layerId,
           type: "raster",
-          source: PROSOPIS_SOURCE_ID,
-          layout: { visibility: prosopisVisible ? "visible" : "none" },
-          paint: { "raster-opacity": prosopisOpacity },
+          source: sourceId,
+          layout: { visibility: prosopisVisible[version.id] ? "visible" : "none" },
+          paint: { "raster-opacity": prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY },
         });
       }
     };
 
-    if (prosopisCache.current) {
-      addToMap(prosopisCache.current);
+    if (prosopisCache.current[version.id]) {
+      addToMap(prosopisCache.current[version.id]);
       return;
     }
-    if (prosopisLoading.current) return;
-    prosopisLoading.current = true;
+    if (prosopisLoading.current[version.id]) return;
+    prosopisLoading.current[version.id] = true;
+    setProsopisStatus(s => ({ ...s, [version.id]: "loading" }));
 
-    rasterToImageSource(PROSOPIS_RASTER_URL)
+    rasterToImageSource(version.url, version.color)
       .then(result => {
-        prosopisCache.current = result;
-        setProsopisStatus("ready");
+        prosopisCache.current[version.id] = result;
+        setProsopisStatus(s => ({ ...s, [version.id]: "ready" }));
         addToMap(result);
       })
-      .catch(() => setProsopisStatus("error"))
-      .finally(() => { prosopisLoading.current = false; });
+      .catch(() => setProsopisStatus(s => ({ ...s, [version.id]: "error" })))
+      .finally(() => { prosopisLoading.current[version.id] = false; });
+  }
+
+  function ensureProsopisLayers() {
+    PROSOPIS_VERSIONS.filter(version => prosopisVisible[version.id]).forEach(loadProsopisVersion);
   }
 
   const kilns = aggregateKilns(batches);
@@ -241,10 +271,11 @@ export default function KilnMap({
 
     // Remove existing layers/sources
     ["kilns-cluster", "kilns-cluster-count", "kilns-glow", "kilns-circle", "kilns-label",
-     "clearance-fill", "clearance-outline", "clearance-label"].forEach(id => {
+     "clearance-fill", "clearance-outline", "clearance-label",
+     "field-trial-fill", "field-trial-outline", "field-trial-label"].forEach(id => {
       if (m.getLayer(id)) m.removeLayer(id);
     });
-    ["kilns", "clearance"].forEach(id => {
+    ["kilns", "clearance", "field-trials"].forEach(id => {
       if (m.getSource(id)) m.removeSource(id);
     });
 
@@ -303,6 +334,61 @@ export default function KilnMap({
 
     m.on("mouseenter", "clearance-fill", () => { m.getCanvas().style.cursor = "pointer"; });
     m.on("mouseleave", "clearance-fill", () => { m.getCanvas().style.cursor = ""; });
+
+    m.addSource("field-trials", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: fieldTrialSites.map(s => ({
+          type: "Feature" as const,
+          geometry: s.polygon,
+          properties: { site_id: s.site_id, submission_id: s.submission_id, submission_time: s.submission_time },
+        })),
+      },
+    });
+
+    m.addLayer({
+      id: "field-trial-fill",
+      type: "fill",
+      source: "field-trials",
+      paint: { "fill-color": "#ef4444", "fill-opacity": 0.15 },
+    });
+
+    m.addLayer({
+      id: "field-trial-outline",
+      type: "line",
+      source: "field-trials",
+      paint: { "line-color": "#ef4444", "line-width": 2, "line-opacity": 0.9 },
+    });
+
+    m.addLayer({
+      id: "field-trial-label",
+      type: "symbol",
+      source: "field-trials",
+      layout: {
+        "text-field": ["get", "site_id"],
+        "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+        "text-size": 11,
+        "text-anchor": "center",
+      },
+      paint: { "text-color": "#fff", "text-halo-color": "#7f1d1d", "text-halo-width": 1.5 },
+    });
+
+    m.on("click", "field-trial-fill", e => {
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
+      const date = props.submission_time ? new Date(props.submission_time).toLocaleDateString() : "—";
+      popup.current?.setLngLat(e.lngLat).setHTML(`
+        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
+          <div style="font-weight:600;margin-bottom:4px">${props.site_id}</div>
+          <div style="color:#78716c">ONA ID: ${props.submission_id}</div>
+          <div style="color:#78716c">Submitted: ${date}</div>
+        </div>
+      `).addTo(m);
+    });
+
+    m.on("mouseenter", "field-trial-fill", () => { m.getCanvas().style.cursor = "pointer"; });
+    m.on("mouseleave", "field-trial-fill", () => { m.getCanvas().style.cursor = ""; });
 
     // Kiln source — clustered, since some kilns sit meters apart (same
     // site) while others are tens of km away. Without clustering, close-by
@@ -440,25 +526,33 @@ export default function KilnMap({
       if (!features.length) { popup.current?.remove(); onKilnSelect?.(null); }
     });
 
-    ensureProsopisLayer();
+    ensureProsopisLayers();
   }
 
   useEffect(() => {
     const m = map.current;
-    if (!m || !m.getLayer(PROSOPIS_LAYER_ID)) return;
-    m.setLayoutProperty(PROSOPIS_LAYER_ID, "visibility", prosopisVisible ? "visible" : "none");
+    if (!m) return;
+    PROSOPIS_VERSIONS.forEach(version => {
+      const layerId = `prosopis-raster-layer-${version.id}`;
+      if (!m.getLayer(layerId)) return;
+      m.setLayoutProperty(layerId, "visibility", prosopisVisible[version.id] ? "visible" : "none");
+    });
   }, [prosopisVisible]);
 
   useEffect(() => {
     const m = map.current;
-    if (!m || !m.getLayer(PROSOPIS_LAYER_ID)) return;
-    m.setPaintProperty(PROSOPIS_LAYER_ID, "raster-opacity", prosopisOpacity);
+    if (!m) return;
+    PROSOPIS_VERSIONS.forEach(version => {
+      const layerId = `prosopis-raster-layer-${version.id}`;
+      if (!m.getLayer(layerId)) return;
+      m.setPaintProperty(layerId, "raster-opacity", prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY);
+    });
   }, [prosopisOpacity]);
 
   useEffect(() => {
     if (ready) renderLayers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, batches, clearanceSites]);
+  }, [ready, batches, clearanceSites, fieldTrialSites]);
 
   function fitToKilns() {
     if (!map.current || kilns.length === 0) return;
@@ -488,36 +582,52 @@ export default function KilnMap({
         <p className="font-semibold text-[10px] uppercase tracking-wider mb-2" style={{ color: "#a8a29e" }}>
           {t("kilnMap.prosopis.title")}
         </p>
-        <label className="flex items-center gap-2 cursor-pointer mb-2.5">
-          <input
-            type="checkbox"
-            checked={prosopisVisible}
-            onChange={e => setProsopisVisible(e.target.checked)}
-            disabled={prosopisStatus !== "ready"}
-          />
-          <span>
-            {prosopisStatus === "loading" ? t("kilnMap.prosopis.loading")
-              : prosopisStatus === "error" ? t("kilnMap.prosopis.error")
-              : t("kilnMap.prosopis.show")}
-          </span>
-        </label>
-        {prosopisStatus === "ready" && (
-          <div className={prosopisVisible ? "" : "opacity-40 pointer-events-none"}>
-            <div className="flex items-center justify-between mb-1">
-              <span style={{ color: "#a8a29e" }}>{t("kilnMap.prosopis.opacity")}</span>
-              <span>{Math.round(prosopisOpacity * 100)}%</span>
+        {PROSOPIS_VERSIONS.map((version, i) => {
+          const status = prosopisStatus[version.id];
+          const visible = prosopisVisible[version.id];
+          const opacity = prosopisOpacity[version.id] ?? PROSOPIS_DEFAULT_OPACITY;
+          return (
+            <div key={version.id} className={i > 0 ? "mt-2 pt-2 border-t" : ""} style={i > 0 ? { borderColor: "#44403c" } : undefined}>
+              <label className="flex items-center gap-2 cursor-pointer mb-1.5">
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setProsopisVisible(v => ({ ...v, [version.id]: checked }));
+                    if (checked) loadProsopisVersion(version);
+                  }}
+                  disabled={status === "loading"}
+                  style={{ width: 14, height: 14 }}
+                />
+                <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: `rgb(${version.color.join(",")})` }} />
+                <span>
+                  {version.label} — {status === "loading" ? t("kilnMap.prosopis.loading")
+                    : status === "error" ? t("kilnMap.prosopis.error")
+                    : t("kilnMap.prosopis.show")}
+                </span>
+              </label>
+              {status === "ready" && (
+                <div className={visible ? "" : "opacity-40 pointer-events-none"}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span style={{ color: "#a8a29e" }}>{t("kilnMap.prosopis.opacity")}</span>
+                    <span>{Math.round(opacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    value={opacity}
+                    onChange={e => setProsopisOpacity(o => ({ ...o, [version.id]: Number(e.target.value) }))}
+                    className="w-full"
+                    style={{ height: 4 }}
+                  />
+                </div>
+              )}
             </div>
-            <input
-              type="range"
-              min={0.1}
-              max={1}
-              step={0.05}
-              value={prosopisOpacity}
-              onChange={e => setProsopisOpacity(Number(e.target.value))}
-              className="w-full"
-            />
-          </div>
-        )}
+          );
+        })}
       </div>
 
       {kilns.length > 0 && (
@@ -562,6 +672,16 @@ export default function KilnMap({
             <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#22c55e", opacity: 0.6 }} />
             <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.clearanceSite")}</span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: "#ef4444", opacity: 0.6 }} />
+            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.fieldTrial")}</span>
+          </div>
+          {PROSOPIS_VERSIONS.map(version => (
+            <div key={version.id} className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: `rgb(${version.color.join(",")})` }} />
+              <span style={{ color: "#e7e5e4" }}>{version.label} (GEE)</span>
+            </div>
+          ))}
           <div className="flex items-center gap-2">
             <span
               className="w-3 h-3 rounded-full flex-shrink-0 flex items-center justify-center"

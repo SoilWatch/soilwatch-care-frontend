@@ -20,9 +20,6 @@ export default function Sidebar({ userName }: { userName?: string }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
 
-  // Close the mobile drawer on navigation — adjusted during render (not in
-  // an effect) per the React-recommended pattern for state that tracks a
-  // changed prop, so it doesn't cause an extra render pass.
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);

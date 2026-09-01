@@ -94,8 +94,6 @@ export default async function MapPage() {
             batches={batches}
             clearanceSites={clearanceSites}
             mapboxToken={MAPBOX_TOKEN}
-            showFeedstockLines
-            showFeedstockMarkers
           />
         </div>
       )}

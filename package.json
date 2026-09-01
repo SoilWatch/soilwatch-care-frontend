@@ -14,6 +14,7 @@
     "@types/mapbox-gl": "^3.4.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
+    "georaster": "^1.6.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.8.0",
     "mapbox-gl": "^3.21.0",

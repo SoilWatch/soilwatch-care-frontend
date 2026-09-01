@@ -3,10 +3,50 @@
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import parseGeoraster from "georaster";
 import type { Batch } from "@/app/biochar/data";
 import { ACTIVE_WINDOW_DAYS } from "@/app/biochar/data";
 import type { ClearanceSite } from "@/app/biochar/clearance";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
+
+const PROSOPIS_RASTER_URL = "https://storage.googleapis.com/soilwatch-gee/Afar_Prosopis_v17_highConfidence.tif";
+const PROSOPIS_SOURCE_ID = "prosopis-raster";
+const PROSOPIS_LAYER_ID = "prosopis-raster-layer";
+const PROSOPIS_COLOR: [number, number, number] = [217, 70, 32];
+const PROSOPIS_DEFAULT_OPACITY = 0.65;
+
+type ImageCoords = [[number, number], [number, number], [number, number], [number, number]];
+
+async function rasterToImageSource(url: string): Promise<{ dataUrl: string; coordinates: ImageCoords }> {
+  const response = await fetch(url);
+  const raster = await parseGeoraster(await response.arrayBuffer());
+  const { width, height, values, noDataValue, xmin, xmax, ymin, ymax } = raster;
+  const band = values[0];
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+  const image = ctx.createImageData(width, height);
+
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const value = band[row][col];
+      const i = (row * width + col) * 4;
+      const detected = value !== noDataValue && value !== 0 && !Number.isNaN(value);
+      image.data[i] = PROSOPIS_COLOR[0];
+      image.data[i + 1] = PROSOPIS_COLOR[1];
+      image.data[i + 2] = PROSOPIS_COLOR[2];
+      image.data[i + 3] = detected ? 255 : 0;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    coordinates: [[xmin, ymax], [xmax, ymax], [xmax, ymin], [xmin, ymin]],
+  };
+}
 
 const TODAY = new Date().toISOString().slice(0, 10);
 function daysBetween(d: string) {
@@ -78,8 +118,6 @@ interface Props {
   mapboxToken: string;
   selectedKiln?: string | null;
   onKilnSelect?: (id: string | null) => void;
-  showFeedstockLines?: boolean;
-  showFeedstockMarkers?: boolean;
   style?: "satellite" | "streets";
 }
 
@@ -90,7 +128,6 @@ const STYLES = {
 
 export default function KilnMap({
   batches, clearanceSites = [], mapboxToken, selectedKiln, onKilnSelect,
-  showFeedstockLines = true, showFeedstockMarkers = true,
   style = "satellite",
 }: Props) {
   const { t } = useLanguage();
@@ -98,6 +135,48 @@ export default function KilnMap({
   const map = useRef<mapboxgl.Map | null>(null);
   const popup = useRef<mapboxgl.Popup | null>(null);
   const [ready, setReady] = useState(false);
+
+  const prosopisCache = useRef<{ dataUrl: string; coordinates: ImageCoords } | null>(null);
+  const prosopisLoading = useRef(false);
+  const [prosopisVisible, setProsopisVisible] = useState(true);
+  const [prosopisOpacity, setProsopisOpacity] = useState(PROSOPIS_DEFAULT_OPACITY);
+  const [prosopisStatus, setProsopisStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  function ensureProsopisLayer() {
+    const m = map.current;
+    if (!m) return;
+
+    const addToMap = (cached: { dataUrl: string; coordinates: ImageCoords }) => {
+      if (!m.getSource(PROSOPIS_SOURCE_ID)) {
+        m.addSource(PROSOPIS_SOURCE_ID, { type: "image", url: cached.dataUrl, coordinates: cached.coordinates });
+      }
+      if (!m.getLayer(PROSOPIS_LAYER_ID)) {
+        m.addLayer({
+          id: PROSOPIS_LAYER_ID,
+          type: "raster",
+          source: PROSOPIS_SOURCE_ID,
+          layout: { visibility: prosopisVisible ? "visible" : "none" },
+          paint: { "raster-opacity": prosopisOpacity },
+        });
+      }
+    };
+
+    if (prosopisCache.current) {
+      addToMap(prosopisCache.current);
+      return;
+    }
+    if (prosopisLoading.current) return;
+    prosopisLoading.current = true;
+
+    rasterToImageSource(PROSOPIS_RASTER_URL)
+      .then(result => {
+        prosopisCache.current = result;
+        setProsopisStatus("ready");
+        addToMap(result);
+      })
+      .catch(() => setProsopisStatus("error"))
+      .finally(() => { prosopisLoading.current = false; });
+  }
 
   const kilns = aggregateKilns(batches);
   const maxKg = Math.max(...kilns.map(k => k.totalKg), 1);
@@ -162,64 +241,12 @@ export default function KilnMap({
 
     // Remove existing layers/sources
     ["kilns-cluster", "kilns-cluster-count", "kilns-glow", "kilns-circle", "kilns-label",
-     "feedstock-lines", "feedstock-markers",
      "clearance-fill", "clearance-outline", "clearance-label"].forEach(id => {
       if (m.getLayer(id)) m.removeLayer(id);
     });
-    ["kilns", "feedstock", "clearance"].forEach(id => {
+    ["kilns", "clearance"].forEach(id => {
       if (m.getSource(id)) m.removeSource(id);
     });
-
-    // Build feedstock source data (unique source locations per kiln)
-    const feedstockFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
-    const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-
-    if (showFeedstockLines || showFeedstockMarkers) {
-      kilns.forEach(kiln => {
-        const kb = batches.filter(b => b.kiln_id === kiln.id && b.feedstock_lat !== 0 && b.feedstock_lon !== 0);
-        const seen = new Set<string>();
-        kb.forEach(b => {
-          const key = `${b.feedstock_lat.toFixed(4)},${b.feedstock_lon.toFixed(4)}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          feedstockFeatures.push({
-            type: "Feature",
-            geometry: { type: "Point", coordinates: [b.feedstock_lon, b.feedstock_lat] },
-            properties: { kiln: kiln.id, source: b.feedstock_source_desc || "", date: b.production_date },
-          });
-          lineFeatures.push({
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: [[b.feedstock_lon, b.feedstock_lat], [kiln.lng, kiln.lat]] },
-            properties: {},
-          });
-        });
-      });
-    }
-
-    m.addSource("feedstock", {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [...feedstockFeatures, ...lineFeatures] },
-    });
-
-    if (showFeedstockLines) {
-      m.addLayer({
-        id: "feedstock-lines",
-        type: "line",
-        source: "feedstock",
-        filter: ["==", "$type", "LineString"],
-        paint: { "line-color": "#d6d3d1", "line-width": 1.5, "line-dasharray": [3, 2], "line-opacity": 0.7 },
-      });
-    }
-
-    if (showFeedstockMarkers) {
-      m.addLayer({
-        id: "feedstock-markers",
-        type: "circle",
-        source: "feedstock",
-        filter: ["==", "$type", "Point"],
-        paint: { "circle-radius": 7, "circle-color": "#38bdf8", "circle-opacity": 0.9, "circle-stroke-width": 1.5, "circle-stroke-color": "#fff" },
-      });
-    }
 
     // Clearance site polygons
     m.addSource("clearance", {
@@ -276,21 +303,6 @@ export default function KilnMap({
 
     m.on("mouseenter", "clearance-fill", () => { m.getCanvas().style.cursor = "pointer"; });
     m.on("mouseleave", "clearance-fill", () => { m.getCanvas().style.cursor = ""; });
-
-    m.on("click", "feedstock-markers", e => {
-      const props = e.features?.[0]?.properties;
-      if (!props) return;
-      popup.current?.setLngLat(e.lngLat).setHTML(`
-        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
-          <div style="font-weight:600;margin-bottom:4px">Feedstock source</div>
-          <div style="color:#78716c">Feeds ${props.kiln}</div>
-          ${props.source ? `<div style="color:#78716c">${props.source}</div>` : ""}
-          ${props.date ? `<div style="color:#78716c">${props.date}</div>` : ""}
-        </div>
-      `).addTo(m);
-    });
-    m.on("mouseenter", "feedstock-markers", () => { m.getCanvas().style.cursor = "pointer"; });
-    m.on("mouseleave", "feedstock-markers", () => { m.getCanvas().style.cursor = ""; });
 
     // Kiln source — clustered, since some kilns sit meters apart (same
     // site) while others are tens of km away. Without clustering, close-by
@@ -427,12 +439,26 @@ export default function KilnMap({
       const features = m.queryRenderedFeatures(e.point, { layers: ["kilns-circle"] });
       if (!features.length) { popup.current?.remove(); onKilnSelect?.(null); }
     });
+
+    ensureProsopisLayer();
   }
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !m.getLayer(PROSOPIS_LAYER_ID)) return;
+    m.setLayoutProperty(PROSOPIS_LAYER_ID, "visibility", prosopisVisible ? "visible" : "none");
+  }, [prosopisVisible]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !m.getLayer(PROSOPIS_LAYER_ID)) return;
+    m.setPaintProperty(PROSOPIS_LAYER_ID, "raster-opacity", prosopisOpacity);
+  }, [prosopisOpacity]);
 
   useEffect(() => {
     if (ready) renderLayers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, batches, clearanceSites, showFeedstockLines, showFeedstockMarkers]);
+  }, [ready, batches, clearanceSites]);
 
   function fitToKilns() {
     if (!map.current || kilns.length === 0) return;
@@ -453,6 +479,47 @@ export default function KilnMap({
   return (
     <div className="relative w-full h-full">
       <div ref={container} className="w-full h-full" />
+
+      {/* Prosopis layer control */}
+      <div
+        className="absolute top-3 left-3 z-10 rounded-xl shadow-lg px-3.5 py-3 text-xs"
+        style={{ background: "rgba(28,25,23,0.9)", color: "#fff", backdropFilter: "blur(4px)", minWidth: 200 }}
+      >
+        <p className="font-semibold text-[10px] uppercase tracking-wider mb-2" style={{ color: "#a8a29e" }}>
+          {t("kilnMap.prosopis.title")}
+        </p>
+        <label className="flex items-center gap-2 cursor-pointer mb-2.5">
+          <input
+            type="checkbox"
+            checked={prosopisVisible}
+            onChange={e => setProsopisVisible(e.target.checked)}
+            disabled={prosopisStatus !== "ready"}
+          />
+          <span>
+            {prosopisStatus === "loading" ? t("kilnMap.prosopis.loading")
+              : prosopisStatus === "error" ? t("kilnMap.prosopis.error")
+              : t("kilnMap.prosopis.show")}
+          </span>
+        </label>
+        {prosopisStatus === "ready" && (
+          <div className={prosopisVisible ? "" : "opacity-40 pointer-events-none"}>
+            <div className="flex items-center justify-between mb-1">
+              <span style={{ color: "#a8a29e" }}>{t("kilnMap.prosopis.opacity")}</span>
+              <span>{Math.round(prosopisOpacity * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0.1}
+              max={1}
+              step={0.05}
+              value={prosopisOpacity}
+              onChange={e => setProsopisOpacity(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        )}
+      </div>
+
       {kilns.length > 0 && (
         <button
           onClick={fitToKilns}
@@ -501,14 +568,6 @@ export default function KilnMap({
               style={{ background: "#1c1917", border: "1.5px solid #fb923c" }}
             />
             <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.cluster")}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#38bdf8" }} />
-            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.feedstockSource")}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-4 h-0 flex-shrink-0" style={{ borderTop: "1.5px dashed #d6d3d1" }} />
-            <span style={{ color: "#e7e5e4" }}>{t("kilnMap.legend.feedstockLink")}</span>
           </div>
         </div>
         <p className="text-[10px] mt-2.5 pt-2.5 border-t" style={{ color: "#a8a29e", borderColor: "#44403c" }}>

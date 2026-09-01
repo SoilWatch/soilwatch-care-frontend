@@ -1,4 +1,15 @@
+import fs from "fs";
+import path from "path";
+
 const ONA_API_BASE = process.env.ONA_API_BASE ?? "https://api.ona.io/api/v1";
+
+function readLocalFile(name: string): string | null {
+  try {
+    return fs.readFileSync(path.join(process.cwd(), "data", name), "utf-8");
+  } catch {
+    return null;
+  }
+}
 const FIELD_TRIAL_FORM_ID = process.env.ONA_FIELD_TRIAL_FORM_ID ?? "891006";
 
 export interface FieldTrialSite {
@@ -64,6 +75,28 @@ function parseSiteId(r: Record<string, unknown>, index: number): string {
 }
 
 export async function loadFieldTrialData(): Promise<FieldTrialDataSource> {
+  // Fast path: use pre-fetched local JSON committed by fetch-ona-data.yml.
+  const localJson = readLocalFile("field_trial_submissions.json");
+  if (localJson) {
+    try {
+      const records = JSON.parse(localJson) as Record<string, unknown>[];
+      const sites: FieldTrialSite[] = [];
+      records.forEach((r, i) => {
+        const result = extractPolygon(r);
+        if (!result) return;
+        sites.push({
+          site_id: parseSiteId(r, i),
+          polygon: result.polygon,
+          submission_id: Number(r["_id"] ?? 0),
+          submission_time: String(r["_submission_time"] ?? ""),
+        });
+      });
+      return { sites, formId: FIELD_TRIAL_FORM_ID, loadedAt: new Date().toISOString() };
+    } catch {
+      // fall through to live fetch
+    }
+  }
+
   const apiToken = process.env.ONA_API_TOKEN;
 
   if (!apiToken) {

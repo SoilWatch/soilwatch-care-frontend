@@ -1,6 +1,16 @@
+import fs from "fs";
+import path from "path";
 import { parseBiocharCsv, type Batch } from "./data";
 import { type RegainRecord, regainToBatch } from "./regain";
 import { getDb, ensureSchema } from "@/lib/db";
+
+function readLocalFile(name: string): string | null {
+  try {
+    return fs.readFileSync(path.join(process.cwd(), "data", name), "utf-8");
+  } catch {
+    return null;
+  }
+}
 
 const ONA_API_BASE = process.env.ONA_API_BASE ?? "https://api.ona.io/api/v1";
 const ONA_REGAIN_FORM_ID = process.env.ONA_REGAIN_FORM_ID ?? "";
@@ -131,6 +141,21 @@ async function loadRegainBatches(): Promise<Batch[]> {
 }
 
 export async function loadBiocharData(): Promise<BiocharDataSource> {
+  // Fast path: use pre-fetched local CSV files committed by fetch-ona-data.yml.
+  // Falls back to live ONA API + DB when files are absent (first deploy, local dev).
+  const biocharCsv = readLocalFile("biochar_submissions.csv");
+  if (biocharCsv) {
+    const onaBatches = parseBiocharCsv(biocharCsv);
+    const regainCsv = readLocalFile("regain_submissions.csv");
+    const regainBatches = regainCsv ? parseRegainCsv(regainCsv).map(regainToBatch) : [];
+    const tagged = onaBatches.map(b => ({ ...b, data_source: "biochar_batch" as const }));
+    return {
+      batches: [...tagged, ...regainBatches].sort((a, b) => b.production_date.localeCompare(a.production_date)),
+      source: "db",
+      loadedAt: new Date().toISOString(),
+    };
+  }
+
   const formId = process.env.ONA_FORM_ID;
   const apiToken = process.env.ONA_API_TOKEN;
 

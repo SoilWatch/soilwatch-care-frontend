@@ -1,4 +1,14 @@
+import fs from "fs";
+import path from "path";
 import { getDb, ensureSchema } from "@/lib/db";
+
+function readLocalFile(name: string): string | null {
+  try {
+    return fs.readFileSync(path.join(process.cwd(), "data", name), "utf-8");
+  } catch {
+    return null;
+  }
+}
 
 const ONA_API_BASE = process.env.ONA_API_BASE ?? "https://api.ona.io/api/v1";
 const CLEARANCE_FORM_ID = process.env.ONA_CLEARANCE_FORM_ID ?? "886132";
@@ -136,6 +146,29 @@ async function upsertSitesToDb(
 }
 
 export async function loadClearanceData(): Promise<ClearanceDataSource> {
+  // Fast path: use pre-fetched local JSON committed by fetch-ona-data.yml.
+  const localJson = readLocalFile("clearance_submissions.json");
+  if (localJson) {
+    try {
+      const records = JSON.parse(localJson) as Record<string, unknown>[];
+      const sites: ClearanceSite[] = [];
+      for (const r of records) {
+        const polygonRaw = String(r["g_site/polygon"] ?? "");
+        const polygon = parseOnaPolygon(polygonRaw);
+        if (!polygon) continue;
+        sites.push({
+          site_id: parseSiteId(r),
+          polygon,
+          submission_id: Number(r["_id"] ?? 0),
+          submission_time: String(r["_submission_time"] ?? ""),
+        });
+      }
+      return { sites, formId: CLEARANCE_FORM_ID, loadedAt: new Date().toISOString() };
+    } catch {
+      // fall through to live fetch
+    }
+  }
+
   const apiToken = process.env.ONA_API_TOKEN;
 
   if (!apiToken) {

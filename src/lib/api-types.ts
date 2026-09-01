@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/field-trials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Field Trials */
+        get: operations["get_field_trials_api_field_trials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/regain-records": {
         parameters: {
             query?: never;
@@ -301,6 +318,28 @@ export interface components {
             /** Loadedat */
             loadedAt: string;
         };
+        /** FieldTrialDataSourceResponse */
+        FieldTrialDataSourceResponse: {
+            /** Sites */
+            sites: components["schemas"]["FieldTrialSite"][];
+            /** Formid */
+            formId: string;
+            /** Error */
+            error?: string | null;
+            /** Loadedat */
+            loadedAt: string;
+        };
+        /** FieldTrialSite */
+        FieldTrialSite: {
+            /** Site Id */
+            site_id: string;
+            /** Polygon */
+            polygon: Record<string, never>;
+            /** Submission Id */
+            submission_id: number;
+            /** Submission Time */
+            submission_time: string;
+        };
         /** RegainDataSourceResponse */
         RegainDataSourceResponse: {
             /** Records */
@@ -419,6 +458,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClearanceDataSourceResponse"];
+                };
+            };
+        };
+    };
+    get_field_trials_api_field_trials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldTrialDataSourceResponse"];
                 };
             };
         };

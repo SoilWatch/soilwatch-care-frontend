@@ -4,8 +4,6 @@ import { loadFieldTrialData } from "../biochar/fieldtrials";
 import KilnMapClient from "@/components/KilnMapClient";
 import { getT } from "@/lib/i18n/server";
 
-export const dynamic = "force-dynamic";
-
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 const C = {

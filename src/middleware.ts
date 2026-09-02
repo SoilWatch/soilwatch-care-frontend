@@ -3,9 +3,13 @@ import { getSessionFromRequest } from "@/lib/auth";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/register-with-invite",
   "/api/auth/login",
-  "/api/auth/verify-2fa",
-  "/api/auth/resend-otp",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/register-with-invite",
 ];
 
 export async function middleware(req: NextRequest) {

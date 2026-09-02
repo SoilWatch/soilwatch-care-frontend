@@ -145,6 +145,11 @@ export default function LoginPage() {
             label={t("login.field.password")} type="password" value={password} onChange={setPassword}
             placeholder={t("login.placeholder.password")} autoComplete="current-password"
           />
+          <div className="flex justify-end -mt-1">
+            <a href="/forgot-password" className="text-xs text-slate-400 hover:text-amber-600 transition-colors">
+              {t("login.forgotPassword")}
+            </a>
+          </div>
           <button
             type="submit" disabled={loading || !email || !password}
             className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-all disabled:opacity-60"

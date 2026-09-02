@@ -26,7 +26,7 @@ export async function POST() {
       body:    JSON.stringify({ refresh_token: refreshToken }),
     });
   } catch {
-    return NextResponse.json({ error: "Cannot reach the authentication server." }, { status: 502 });
+    return NextResponse.json({ error: "Service unavailable. Please try again later." }, { status: 502 });
   }
 
   if (!res.ok) {

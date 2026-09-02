@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       body:    JSON.stringify({ email }),
     });
   } catch {
-    return NextResponse.json({ error: "Cannot reach the authentication server." }, { status: 502 });
+    return NextResponse.json({ error: "Service unavailable. Please try again later." }, { status: 502 });
   }
 
   // Always respond with the same message regardless of whether the email exists

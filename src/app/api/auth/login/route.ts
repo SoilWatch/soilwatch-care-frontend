@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       body:    JSON.stringify({ email, password }),
     });
   } catch {
-    return NextResponse.json({ error: "Cannot reach the authentication server. Try again later." }, { status: 502 });
+    return NextResponse.json({ error: "Service unavailable. Please try again later." }, { status: 502 });
   }
 
   const tokenData = await loginRes.json().catch(() => ({}));
@@ -45,12 +45,12 @@ export async function POST(request: Request) {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
   } catch {
-    return NextResponse.json({ error: "Login succeeded but profile could not be loaded." }, { status: 502 });
+    return NextResponse.json({ error: "Authentication succeeded but your profile could not be loaded. Please try again." }, { status: 502 });
   }
 
   const user = await meRes.json().catch(() => ({}));
   if (!meRes.ok) {
-    return NextResponse.json({ error: "Login succeeded but profile unavailable." }, { status: 502 });
+    return NextResponse.json({ error: "Authentication succeeded but your profile could not be loaded. Please try again." }, { status: 502 });
   }
 
   const payload: SessionPayload = {

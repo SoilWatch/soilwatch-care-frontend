@@ -132,7 +132,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 pt-5 pb-1">
           <h1 className="text-sm font-bold text-slate-800">{t("login.tab.signin")}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{t("login.subtitle2fa")}</p>
+          <p className="text-xs text-slate-400 mt-0.5">{t("login.form.subtitle")}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">

@@ -205,7 +205,7 @@ export default function TabProduction({ df, siteTrends, operatorScores }: Props)
           <div className="flex flex-wrap gap-3 mb-4">
             {siteTrends.map(r => (
               <div key={r.site} className="rounded-xl border p-3 flex flex-col min-w-28 flex-1"
-                style={{ borderColor: C.border, borderTop: `3px solid ${ragColor(r.rag)}` }}>
+                style={{ borderColor: C.border }}>
                 <div className="text-[10px]" style={{ color: C.muted }}>#{r.rank}</div>
                 <div className="text-sm font-semibold mt-0.5 truncate" style={{ color: C.text }}>{r.site}</div>
                 <div className="text-3xl font-bold mt-1" style={{ color: ragColor(r.rag) }}>{r.score}</div>

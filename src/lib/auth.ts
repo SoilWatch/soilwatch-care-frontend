@@ -1,7 +1,7 @@
 /**
  * Auth utilities for the Next.js frontend.
  *
- * Three cookies are stored after a successful 2FA login:
+ * Three cookies are stored after a successful login:
  *   sw_session       – signed frontend JWT (display info: userId, email, fullName, role)
  *   sw_access_token  – backend JWT (24 h) forwarded to backend API calls
  *   sw_refresh_token – backend JWT (7 d) used to obtain new access tokens

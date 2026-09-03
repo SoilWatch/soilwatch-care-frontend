@@ -220,14 +220,7 @@ export default function BiocharDashboard({ dataSource }: Props) {
         <KpiCard
           label={t("biochar.kpi.biocharProduced")}
           value={hasData ? `${kpis.combinedBiochar.toFixed(0)} kg` : "—"}
-          sub={
-            !hasData ? undefined
-            : kpis.regainBiochar > 0
-              ? t("biochar.kpi.biocharProduced.breakdown", {
-                  measured: kpis.totalBiochar.toFixed(0), est: kpis.regainBiochar.toFixed(0),
-                })
-              : t("biochar.kpi.biocharProduced.sub", { n: kpis.dryBiochar.toFixed(0) })
-          }
+          sub={hasData ? t("biochar.kpi.biocharProduced.sub", { n: kpis.dryBiochar.toFixed(0) }) : undefined}
         />
         <KpiCard
           label={t("biochar.kpi.activeKilns")}

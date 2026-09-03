@@ -1,6 +1,5 @@
 import type { components } from "@/lib/api-types";
-
-const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
+import { backendFetch } from "@/lib/backend-fetch";
 
 // `polygon` is narrowed to GeoJSON.Polygon — the backend types it as a
 // generic object since Pydantic doesn't model GeoJSON.
@@ -17,7 +16,7 @@ export interface ClearanceDataSource extends Omit<BackendClearanceResponse, "sit
 
 export async function loadClearanceData(): Promise<ClearanceDataSource> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/clearance-sites`, { cache: "no-store" });
+    const res = await backendFetch("/api/clearance-sites", { cache: "no-store" });
     if (!res.ok) {
       return {
         sites: [],

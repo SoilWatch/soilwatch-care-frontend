@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-
-const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
+import { backendFetch } from "@/lib/backend-fetch";
 
 export async function GET() {
   const session = await getSession();
@@ -10,7 +9,7 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/api/reports/archive`, { cache: "no-store" });
+    const res = await backendFetch("/api/reports/archive", { cache: "no-store" });
     if (!res.ok) {
       return NextResponse.json({ reports: [], error: `Backend returned ${res.status}.` }, { status: 502 });
     }

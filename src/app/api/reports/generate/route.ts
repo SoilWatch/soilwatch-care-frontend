@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-
-const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
+import { backendFetch } from "@/lib/backend-fetch";
 
 const FORMATS = new Set(["pdf", "docx"]);
 
@@ -24,7 +23,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/api/reports/production?${qs}`, { cache: "no-store" });
+    const res = await backendFetch(`/api/reports/production?${qs}`, { cache: "no-store" });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       return NextResponse.json(

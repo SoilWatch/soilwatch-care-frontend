@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-
-const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
+import { backendFetch } from "@/lib/backend-fetch";
 
 const ID_RE = /^[0-9]{8}_[0-9]{6}_(pdf|docx)$/;
 
@@ -19,7 +18,7 @@ export async function GET(_request: Request, { params }: Ctx) {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/api/reports/archive/${id}`, { cache: "no-store" });
+    const res = await backendFetch(`/api/reports/archive/${id}`, { cache: "no-store" });
     if (!res.ok) {
       return NextResponse.json({ error: `Report not found (${res.status}).` }, { status: res.status });
     }
@@ -50,7 +49,7 @@ export async function DELETE(_request: Request, { params }: Ctx) {
   }
 
   try {
-    const res = await fetch(`${BACKEND_URL}/api/reports/archive/${id}`, {
+    const res = await backendFetch(`/api/reports/archive/${id}`, {
       method: "DELETE",
       cache: "no-store",
     });

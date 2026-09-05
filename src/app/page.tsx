@@ -131,13 +131,6 @@ export default async function OverviewPage() {
               ok: hasData,
             },
             {
-              href: "/prosopis",
-              title: t("overview.module.prosopis.title"),
-              desc: t("overview.module.prosopis.desc"),
-              badge: t("overview.module.prosopis.badge"),
-              ok: false,
-            },
-            {
               href: "/reports",
               title: t("overview.module.reports.title"),
               desc: t("overview.module.reports.desc"),

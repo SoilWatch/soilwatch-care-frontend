@@ -1,6 +1,5 @@
 import type { components } from "@/lib/api-types";
-
-const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
+import { backendFetch } from "@/lib/backend-fetch";
 
 type BackendFieldTrialSite = components["schemas"]["FieldTrialSite"];
 type BackendFieldTrialResponse = components["schemas"]["FieldTrialDataSourceResponse"];
@@ -15,7 +14,7 @@ export interface FieldTrialDataSource extends Omit<BackendFieldTrialResponse, "s
 
 export async function loadFieldTrialData(): Promise<FieldTrialDataSource> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/field-trials`, { cache: "no-store" });
+    const res = await backendFetch("/api/field-trials", { cache: "no-store" });
     if (!res.ok) {
       return {
         sites: [],

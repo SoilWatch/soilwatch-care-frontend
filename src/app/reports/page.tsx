@@ -1,5 +1,6 @@
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
+import ReportGenerator from "@/components/ReportGenerator";
 import { FileText, Lock } from "lucide-react";
 import { getT } from "@/lib/i18n/server";
 
@@ -7,16 +8,19 @@ export default async function ReportsPage() {
   const t = await getT();
 
   const reports = [
-    { title: t("reports.item.coverage"),   status: t("reports.status.template"),         standard: null },
+    { title: t("reports.item.coverage"),   status: t("reports.status.template"),        standard: null },
     { title: t("reports.item.production"), status: t("reports.status.available"),        standard: null },
-    { title: t("reports.item.vm0044"),     status: t("reports.status.pendingFactors"),   standard: "VM0044" },
-    { title: t("reports.item.csi"),        status: t("reports.status.pendingSensors"),   standard: "CSI C-Sink" },
+    { title: t("reports.item.csi"),        status: t("reports.status.pendingSensors"),  standard: "CSI C-Sink" },
   ];
   const availableStatus = t("reports.status.available");
 
   return (
     <div className="min-h-full bg-white">
       <PageHeader title={t("reports.title")} description={t("reports.description")} />
+
+      <div className="px-6 pt-4">
+        <ReportGenerator />
+      </div>
 
       <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         {reports.map((report) => {

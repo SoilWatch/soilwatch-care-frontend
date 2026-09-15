@@ -1,8 +1,6 @@
 import type { components } from "@/lib/api-types";
 import { backendFetch } from "@/lib/backend-fetch";
 
-// `polygon` is narrowed to GeoJSON.Polygon — the backend types it as a
-// generic object since Pydantic doesn't model GeoJSON.
 type BackendClearanceSite = components["schemas"]["ClearanceSite"];
 type BackendClearanceResponse = components["schemas"]["ClearanceDataSourceResponse"];
 

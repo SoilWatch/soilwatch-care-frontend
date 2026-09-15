@@ -1,9 +1,3 @@
-// regain.ts — adapts regain_kiln_operator (simplified per-burn kiln log)
-// records into the same Batch shape as biochar_batch.
-//
-// biochar_dry_weight_kg_estimated is buckets_out * 8, not a moisture-derived
-// figure — never run it through the wet/dry moisture formula.
-
 import type { Batch, VisualQuality } from "./data";
 import { PYRO_MIN, PYRO_MAX } from "./data";
 
@@ -54,9 +48,9 @@ export function regainToBatch(r: RegainRecord): Batch {
   const pyrolysisDurationMin = r.pyrolysis_duration_min ?? 0;
 
   const pf = r.photo_feedstock_pile?.startsWith("http") ?? false;
-  const pa = false; // regain's active-pyrolysis photo is per-feed-bundle, no single reliable field
+  const pa = false;
   const pb = r.photo_biochar_output?.startsWith("http") ?? false;
-  const ps = false; // regain has no sample-bag photo field
+  const ps = false;
 
   const c_feedstock_weight = (r.feedstock_weight_kg ?? 0) > 0;
   const c_feedstock_moisture = false; // not captured by either form — no moisture meters

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, FlameKindling, MapPin, FileBarChart2, Settings, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, FlameKindling, MapPin, FileBarChart2, Settings, Menu, X, LogOut, UserCircle } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import LanguageSwitcher from "./LanguageSwitcher";
 
@@ -15,7 +15,7 @@ const NAV = [
   { href: "/reports", key: "nav.reports",    icon: FileBarChart2 },
 ];
 
-export default function Sidebar({ userName, role }: { userName?: string; role?: string }) {
+export default function Sidebar({ userName, userEmail, role }: { userName?: string; userEmail?: string; role?: string }) {
   const pathname = usePathname();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -133,7 +133,31 @@ export default function Sidebar({ userName, role }: { userName?: string; role?: 
         </nav>
 
         <div className="px-4 py-4 border-t border-stone-800">
-          {userName && <p className="text-xs text-stone-400 truncate mb-2">{userName}</p>}
+          <Link
+            href="/profile"
+            className="flex items-center gap-2.5 mb-3 group"
+          >
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-semibold text-white"
+              style={{ background: "#c2410c" }}
+            >
+              {userName
+                ? userName.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("")
+                : <UserCircle size={14} />}
+            </div>
+            <div className="min-w-0">
+              {userName && (
+                <p className="text-xs font-medium text-stone-300 group-hover:text-white transition-colors truncate">
+                  {userName}
+                </p>
+              )}
+              {userEmail && (
+                <p className="text-[11px] text-stone-500 group-hover:text-stone-400 transition-colors truncate">
+                  {userEmail}
+                </p>
+              )}
+            </div>
+          </Link>
           <button onClick={signOut}
             className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-white transition-colors">
             <LogOut size={12} />

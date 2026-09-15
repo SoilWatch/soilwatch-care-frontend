@@ -1,4 +1,3 @@
-// ── Constants ──────────────────────────────────────────────────────────────
 export const PYRO_MIN = 60;
 export const PYRO_MAX = 240;
 export const ACTIVE_WINDOW_DAYS = 14;
@@ -6,7 +5,6 @@ export const COMPLIANCE_WINDOW_DAYS = 30;
 export const MOISTURE_ESTIMATE = 0.15;
 export const SUBMISSION_LAG_SLA_DAYS = 3;
 
-// ── Types ──────────────────────────────────────────────────────────────────
 export type FeedstockAppearance = "dry" | "mostly_dry" | "partially_wet" | "wet";
 export type VisualQuality = "excellent" | "good" | "fair" | "poor";
 export type SmokeLevel = "none" | "minimal" | "moderate" | "heavy" | "very_heavy";
@@ -24,14 +22,14 @@ export interface Batch {
   feedstock_type: string;
   feedstock_appearance: FeedstockAppearance;
   feedstock_volume_m3: number;
-  feedstock_weight_kg: number | null; // null until scales deployed
+  feedstock_weight_kg: number | null; 
   feedstock_drying_days: number;
   feedstock_piece_size: string;
   feedstock_source_desc: string;
   feedstock_tracking_id: string;
   feedstock_lat: number;
   feedstock_lon: number;
-  production_date: string; // YYYY-MM-DD
+  production_date: string;
   production_lat: number;
   production_lon: number;
   quench_method: string;
@@ -74,10 +72,10 @@ export interface Batch {
   photo_sample_bag_ok: boolean;
   photos_captured: number;
   csi_photos_captured: number;
-  quality_score: number; // 1=poor → 4=excellent
+  quality_score: number; 
   // Compliance flags
   c_feedstock_weight: boolean;
-  c_feedstock_moisture: boolean; // always false — no moisture meters
+  c_feedstock_moisture: boolean; 
   c_feedstock_dryness: boolean;
   c_biochar_weight: boolean;
   c_visual_quality: boolean;
@@ -85,11 +83,11 @@ export interface Batch {
   c_sample_collected: boolean;
   c_no_safety_incidents: boolean;
   c_duration_in_range: boolean;
-  c_operator_certified: boolean; // always true (placeholder)
+  c_operator_certified: boolean; 
   c_photo_feedstock: boolean;
   c_photo_biochar: boolean;
   c_photo_sample_bag: boolean;
-  c_temp_data: boolean; // always false — no sensors
+  c_temp_data: boolean;
   csi_compliant: boolean;
   compliance_fails: number;
 }

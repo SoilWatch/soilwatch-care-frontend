@@ -16,13 +16,10 @@ function secret(): Uint8Array {
 
 const isProd = process.env.NODE_ENV === "production";
 
-// ── Session payload (stored in sw_session, signed by Next.js) ────────────
-
 export interface SessionPayload {
-  userId:   string;
-  email:    string;
-  fullName: string;
-  role:     string; // role name from backend, e.g. "admin" | "user"
+  email: string;
+  name:  string;
+  role:  string; 
 }
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -42,8 +39,6 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   }
 }
 
-// ── Read session (server components / layouts) ────────────────────────────
-
 export async function getSession(): Promise<SessionPayload | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
@@ -51,14 +46,11 @@ export async function getSession(): Promise<SessionPayload | null> {
   return verifySessionToken(token);
 }
 
-// Edge-compatible (middleware) — reads from the request directly
 export async function getSessionFromRequest(req: NextRequest): Promise<SessionPayload | null> {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   return verifySessionToken(token);
 }
-
-// ── Read backend tokens (server components / API routes) ─────────────────
 
 export async function getAccessToken(): Promise<string | undefined> {
   const store = await cookies();
@@ -69,8 +61,6 @@ export async function getRefreshToken(): Promise<string | undefined> {
   const store = await cookies();
   return store.get(REFRESH_COOKIE)?.value;
 }
-
-// ── Cookie option builders ────────────────────────────────────────────────
 
 export async function sessionCookieOptions(payload: SessionPayload) {
   const token = await createSessionToken(payload);

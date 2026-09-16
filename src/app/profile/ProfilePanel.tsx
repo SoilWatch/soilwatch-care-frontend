@@ -54,6 +54,14 @@ export default function ProfilePanel({ name, email, role }: Props) {
       setError("New password must be at least 8 characters.");
       return;
     }
+    if (!/[A-Z]/.test(newPw)) {
+      setError("New password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/[0-9]/.test(newPw)) {
+      setError("New password must contain at least one digit.");
+      return;
+    }
     if (newPw !== confirmPw) {
       setError("New passwords do not match.");
       return;

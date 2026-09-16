@@ -8,6 +8,7 @@ export const REFRESH_COOKIE  = "sw_refresh_token";
 
 const COOKIE_NAME = "sw_session";
 const SESSION_DAYS = 7;
+const ACCESS_TOKEN_SECONDS = 15 * 60;
 
 function secret(): Uint8Array {
   const key = process.env.AUTH_SECRET ?? "soilwatch-dev-secret-change-in-production";

@@ -68,7 +68,17 @@ export async function sessionCookieOptions(payload: SessionPayload) {
   return { name: SESSION_COOKIE, value: token, httpOnly: true, secure: isProd, sameSite: "lax" as const, maxAge: SESSION_DAYS * 24 * 3600, path: "/" };
 }
 
+const REFRESH_TOKEN_SECONDS = 7 * 24 * 3600;
+
 export function accessCookieOptions(token: string) {
   return { name: ACCESS_COOKIE, value: token, httpOnly: true, secure: isProd, sameSite: "lax" as const, maxAge: ACCESS_TOKEN_SECONDS, path: "/" };
+}
+
+export function refreshCookieOptions(token: string) {
+  return { name: REFRESH_COOKIE, value: token, httpOnly: true, secure: isProd, sameSite: "lax" as const, maxAge: REFRESH_TOKEN_SECONDS, path: "/" };
+}
+
+export function clearCookieOptions(name: string) {
+  return { name, value: "", httpOnly: true, secure: isProd, sameSite: "lax" as const, maxAge: 0, path: "/" };
 }
 

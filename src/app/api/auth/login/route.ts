@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createSessionToken, sessionCookieOptions } from "@/lib/auth";
+import {
+  accessCookieOptions,
+  refreshCookieOptions,
+  sessionCookieOptions,
+} from "@/lib/auth";
 
 const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
 
@@ -13,6 +17,7 @@ export async function POST(request: Request) {
   }
 
   let accessToken: string;
+  let refreshToken: string;
   try {
     const loginRes = await fetch(`${BACKEND_URL}/auth/login`, {
       method: "POST",
@@ -27,7 +32,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Authentication service unavailable." }, { status: 503 });
     }
     const tokens = await loginRes.json();
-    accessToken = tokens.access_token;
+    accessToken  = tokens.access_token;
+    refreshToken = tokens.refresh_token;
   } catch {
     return NextResponse.json({ error: "Authentication service unavailable." }, { status: 503 });
   }
@@ -49,9 +55,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Authentication service unavailable." }, { status: 503 });
   }
 
-  const token = await createSessionToken({ email, name, role });
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(await sessionCookieOptions(payload));
+  response.cookies.set(await sessionCookieOptions({ email, name, role }));
   response.cookies.set(accessCookieOptions(accessToken));
   response.cookies.set(refreshCookieOptions(refreshToken));
   return response;

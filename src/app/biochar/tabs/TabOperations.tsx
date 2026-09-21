@@ -208,18 +208,33 @@ export default function TabOperations({
                 [b.photo_active_pyrolysis, t("tabOperations.photo.pyrolysis")],
                 [b.photo_biochar_output, t("tabOperations.photo.output")],
                 [b.photo_sample_bag, t("tabOperations.photo.sample")],
-              ] as [string | null, string][]).filter(([url]) => url).map(([url, label]) => (
-                <div key={`${b.batch_id}-${label}`} className="rounded-lg border overflow-hidden" style={{ borderColor: C.border }}>
-                  <a href={url!} target="_blank" rel="noopener noreferrer">
-                    <div className="h-24 bg-stone-100 flex items-center justify-center text-xs" style={{ color: C.muted }}>
-                      {label}
+              ] as [string | null, string][]).filter(([url]) => url).map(([url, label]) => {
+                const proxied = `/api/photo?url=${encodeURIComponent(url!)}`;
+                return (
+                  <div key={`${b.batch_id}-${label}`} className="rounded-lg border overflow-hidden" style={{ borderColor: C.border }}>
+                    <a href={proxied} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={proxied}
+                        alt={`${b.batch_id} — ${label}`}
+                        loading="lazy"
+                        className="w-full h-24 object-cover bg-stone-100"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const placeholder = el.nextElementSibling as HTMLElement | null;
+                          if (placeholder) placeholder.style.display = "flex";
+                        }}
+                      />
+                      <div className="h-24 bg-stone-100 items-center justify-center text-xs hidden" style={{ color: C.muted }}>
+                        {label}
+                      </div>
+                    </a>
+                    <div className="px-2 py-1 text-[10px]" style={{ color: C.muted }}>
+                      {b.batch_id.slice(-5)} · {label}
                     </div>
-                  </a>
-                  <div className="px-2 py-1 text-[10px]" style={{ color: C.muted }}>
-                    {b.batch_id.slice(-5)} · {label}
                   </div>
-                </div>
-              ))
+                );
+              })
             ).slice(0, 16)}
           </div>
         </Panel>

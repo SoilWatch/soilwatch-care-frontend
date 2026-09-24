@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, useId } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
@@ -151,6 +152,14 @@ export default function LoginPage() {
             }
           </button>
         </form>
+
+        <p className="mt-5 text-center text-xs" style={{ color: "#a8a29e" }}>
+          {t("login.noAccount")}{" "}
+          <Link href="/register" className="font-medium underline transition-opacity hover:opacity-70"
+            style={{ color: "#1c1917" }}>
+            {t("login.createAccount")}
+          </Link>
+        </p>
       </div>
 
       {/* Language switcher */}

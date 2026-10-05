@@ -405,10 +405,16 @@ export default function KilnMap({
       if (!props) return;
       const date = props.submission_time ? new Date(props.submission_time).toLocaleDateString() : "—";
       popup.current?.setLngLat(e.lngLat).setHTML(`
-        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px">
-          <div style="font-weight:600;margin-bottom:4px">${props.site_id}</div>
-          <div style="color:#78716c">ONA ID: ${props.submission_id}</div>
-          <div style="color:#78716c">Submitted: ${date}</div>
+        <div style="font-family:system-ui;font-size:12px;color:#1c1917;padding:2px;min-width:180px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px;border-bottom:1px solid #e7e5e4;padding-bottom:4px">Field Trial Site</div>
+          <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:3px">
+            <span style="color:#78716c;white-space:nowrap">Submission ID</span>
+            <span style="font-weight:600;text-align:right">${props.submission_id}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:12px">
+            <span style="color:#78716c;white-space:nowrap">Submitted</span>
+            <span style="font-weight:600;text-align:right">${date}</span>
+          </div>
         </div>
       `).addTo(m);
     });
@@ -548,8 +554,10 @@ export default function KilnMap({
     m.on("mouseenter", "kilns-circle", () => { m.getCanvas().style.cursor = "pointer"; });
     m.on("mouseleave", "kilns-circle", () => { m.getCanvas().style.cursor = ""; });
     m.on("click", e => {
-      const features = m.queryRenderedFeatures(e.point, { layers: ["kilns-circle"] });
-      if (!features.length) { popup.current?.remove(); onKilnSelect?.(null); }
+      const hit = m.queryRenderedFeatures(e.point, {
+        layers: ["kilns-circle", "field-trial-fill", "clearance-fill"],
+      });
+      if (!hit.length) { popup.current?.remove(); onKilnSelect?.(null); }
     });
 
     ensureProsopisLayers();

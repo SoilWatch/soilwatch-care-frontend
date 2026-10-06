@@ -27,11 +27,11 @@ export interface Batch {
   feedstock_piece_size: string;
   feedstock_source_desc: string;
   feedstock_tracking_id: string;
-  feedstock_lat: number;
-  feedstock_lon: number;
+  feedstock_lat: number | null;
+  feedstock_lon: number | null;
   production_date: string;
-  production_lat: number;
-  production_lon: number;
+  production_lat: number | null;
+  production_lon: number | null;
   quench_method: string;
   num_feed_cycles: number;
   weather_conditions: string;
@@ -325,11 +325,11 @@ export function parseBiocharCsv(text: string): Batch[] {
       feedstock_piece_size: cleanString(aliased(record, "feedstock_piece_size")),
       feedstock_source_desc: cleanString(aliased(record, "feedstock_source_desc")),
       feedstock_tracking_id: cleanString(aliased(record, "feedstock_tracking_id")),
-      feedstock_lat: toNumber(aliased(record, "feedstock_lat")) ?? 0,
-      feedstock_lon: toNumber(aliased(record, "feedstock_lon")) ?? 0,
+      feedstock_lat: toNumber(aliased(record, "feedstock_lat")) ?? null,
+      feedstock_lon: toNumber(aliased(record, "feedstock_lon")) ?? null,
       production_date: productionDate,
-      production_lat: toNumber(aliased(record, "production_lat")) ?? 0,
-      production_lon: toNumber(aliased(record, "production_lon")) ?? 0,
+      production_lat: toNumber(aliased(record, "production_lat")) ?? null,
+      production_lon: toNumber(aliased(record, "production_lon")) ?? null,
       quench_method: cleanString(aliased(record, "quench_method")),
       num_feed_cycles: toNumber(aliased(record, "num_feed_cycles")) ?? 0,
       weather_conditions: cleanString(aliased(record, "weather_conditions")),

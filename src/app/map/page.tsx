@@ -22,7 +22,7 @@ export default async function MapPage() {
   const clearanceSites = clearanceData.sites;
   const fieldTrialSites = fieldTrialData.sites;
 
-  const kilnSet = new Map<string, { lat: number; lon: number; batches: number; totalKg: number; lastDate: string }>();
+  const kilnSet = new Map<string, { lat: number | null; lon: number | null; batches: number; totalKg: number; lastDate: string }>();
   batches.forEach(b => {
     const k = kilnSet.get(b.kiln_id) ?? { lat: b.production_lat, lon: b.production_lon, batches: 0, totalKg: 0, lastDate: "" };
     k.batches++;

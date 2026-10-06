@@ -90,9 +90,9 @@ function aggregateKilns(batches: Batch[]): KilnSummary[] {
     // Fall back to the most recent batch that actually has GPS — a regain
     // log with no coordinates shouldn't knock an otherwise well-located
     // kiln off the map just because it's the latest record.
-    const withGps = sorted.find(b => b.production_lat !== 0 && b.production_lon !== 0);
-    const lat = withGps?.production_lat || 0;
-    const lng = withGps?.production_lon || 0;
+    const withGps = sorted.find(b => b.production_lat && b.production_lon);
+    const lat = withGps?.production_lat ?? 0;
+    const lng = withGps?.production_lon ?? 0;
     const daysIdle = daysBetween(last.production_date);
     const totalKg = bs.reduce((s, b) => s + b.biochar_wet_weight_kg, 0);
     const recent = bs.filter(b => daysBetween(b.production_date) <= 30);

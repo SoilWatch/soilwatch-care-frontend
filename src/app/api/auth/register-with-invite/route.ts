@@ -26,7 +26,12 @@ export async function POST(request: Request) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const detail = typeof data.detail === "string" ? data.detail : "Registration failed. The invite link may be invalid or expired.";
+    const detail =
+      typeof data.detail === "string"
+        ? data.detail
+        : Array.isArray(data.detail)
+          ? data.detail.map((d: { msg?: string }) => d.msg ?? "Invalid field").join(". ")
+          : "Registration failed. The invite link may be invalid or expired.";
     return NextResponse.json({ error: detail }, { status: res.status });
   }
 

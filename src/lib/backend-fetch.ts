@@ -1,29 +1,9 @@
+import { getAccessToken, getRefreshToken } from "@/lib/auth";
+
 const BACKEND_URL = process.env.FASTAPI_URL ?? "http://localhost:8000";
-const SERVICE_EMAIL = process.env.ADMIN_EMAIL;
-const SERVICE_PASSWORD = process.env.ADMIN_PASSWORD;
-
-let cachedToken: string | null = null;
-
-async function login(): Promise<string | null> {
-  if (!SERVICE_EMAIL || !SERVICE_PASSWORD) return null;
-  try {
-    const res = await fetch(`${BACKEND_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: SERVICE_EMAIL, password: SERVICE_PASSWORD }),
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    cachedToken = typeof data?.access_token === "string" ? data.access_token : null;
-    return cachedToken;
-  } catch {
-    return null;
-  }
-}
 
 export async function backendFetch(path: string, init?: RequestInit): Promise<Response> {
-  const send = (token: string | null) =>
+  const send = (token: string | undefined) =>
     fetch(`${BACKEND_URL}${path}`, {
       ...init,
       headers: {
@@ -32,11 +12,28 @@ export async function backendFetch(path: string, init?: RequestInit): Promise<Re
       },
     });
 
-  let token = cachedToken ?? (await login());
+  const token = await getAccessToken();
   let res = await send(token);
+
   if (res.status === 401) {
-    token = await login();
-    res = await send(token);
+    const refreshToken = await getRefreshToken();
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${BACKEND_URL}/auth/refresh-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+          cache: "no-store",
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          res = await send(data.access_token);
+        }
+      } catch {
+        // refresh failed — return the original 401
+      }
+    }
   }
+
   return res;
 }

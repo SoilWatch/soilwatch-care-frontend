@@ -22,6 +22,7 @@ const ROLE_LABEL: Record<string, string> = {
   project_officer: "Project Officer",
   supervisor:      "Supervisor",
   certifier:       "Certifier",
+  user:            "User",
 };
 
 export default function AdminPanel({
@@ -36,6 +37,24 @@ export default function AdminPanel({
   const [roleId, setRoleId] = useState(roles[0]?.id ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [assigningRole, setAssigningRole] = useState<Record<string, boolean>>({});
+
+  async function changeRole(userId: string, newRoleId: string) {
+    setAssigningRole(p => ({ ...p, [userId]: true }));
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role_id: newRoleId || null }),
+      });
+      if (res.ok) {
+        const updated: User = await res.json();
+        setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+      }
+    } finally {
+      setAssigningRole(p => ({ ...p, [userId]: false }));
+    }
+  }
 
   async function sendInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -135,8 +154,21 @@ export default function AdminPanel({
                   <tr key={u.id} className="border-t" style={{ borderColor: C.border }}>
                     <td className="py-2.5 pr-6 font-medium" style={{ color: C.text }}>{u.full_name}</td>
                     <td className="py-2.5 pr-6" style={{ color: C.muted }}>{u.email}</td>
-                    <td className="py-2.5 pr-6" style={{ color: C.text }}>
-                      {u.role ? (ROLE_LABEL[u.role.name] ?? u.role.name) : "—"}
+                    <td className="py-2.5 pr-6">
+                      <select
+                        value={u.role?.id ?? ""}
+                        disabled={assigningRole[u.id]}
+                        onChange={e => changeRole(u.id, e.target.value)}
+                        className="border rounded-md px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-stone-400 bg-white disabled:opacity-50"
+                        style={{ borderColor: C.border, color: C.text }}
+                      >
+                        <option value="">— No role —</option>
+                        {roles.map(r => (
+                          <option key={r.id} value={r.id}>
+                            {ROLE_LABEL[r.name] ?? r.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="py-2.5">
                       <span
